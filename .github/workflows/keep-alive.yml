@@ -1,0 +1,19 @@
+name: Keep Supabase awake
+
+# Free Supabase projects pause after a week without activity.
+# One small public read a day keeps the library online.
+on:
+  schedule:
+    - cron: "17 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read one rating
+        run: |
+          URL=$(grep -o "https://[a-z0-9]*\.supabase\.co" supabase-config.js)
+          KEY=$(grep -o "eyJ[^']*" supabase-config.js)
+          curl -sf "$URL/rest/v1/ratings?select=id&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"

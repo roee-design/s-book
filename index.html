@@ -336,11 +336,11 @@ a.book:hover { border-color: var(--accent); border-inline-start-color: var(--cat
 :root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
 body { margin: 0; }
 [hidden] { display: none !important; }
-img { max-width: 100%; }
-.who-wrap { display: grid; gap: 8px; justify-items: end; }
 .notice { background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 10px 14px; margin: 0; font-weight: 600; }
-.admin-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; font-weight: 600; }
-@media (max-width: 900px) { .who-wrap { justify-items: start; } }
+.acct { display: grid; gap: 14px; background: var(--sunk); border-radius: 8px; padding: 16px; }
+.acct-row { display: flex; gap: 8px; }
+.acct-row input { font-family: var(--mono); font-size: 0.85rem; min-width: 0; }
+.acct-row .btn { flex: none; }
 </style>
 </head>
 <body>
@@ -351,18 +351,11 @@ img { max-width: 100%; }
       <h1>מדד ה-<span class="latin">S-Book</span></h1>
       <p class="lede">מחשבון אובייקטיבי לדירוג רמת המיניות בספרים, כדי שתדעו בדיוק למה לצפות לפני שאתם מתחילים לקרוא.</p>
     </div>
-    <div class="who-wrap">
     <div class="who" id="whoBar" hidden>
       <span class="admin-chip" id="adminChip" hidden>מנהל</span>
       <span>שלום, <b id="whoName"></b></span>
       <span class="ichip" id="whoI"></span>
       <button type="button" class="link" id="editProfile">שינוי פרופיל</button>
-    </div>
-    <div class="who" id="authBox" hidden>
-      <span id="authState"></span>
-      <button type="button" class="btn" id="signInBtn">התחברות עם Google</button>
-      <button type="button" class="link" id="signOutBtn" hidden>התנתקות</button>
-    </div>
     </div>
   </header>
 
@@ -401,8 +394,19 @@ img { max-width: 100%; }
       <button type="button" class="link" id="obCancel" hidden>ביטול</button>
     </div>
     <p class="ob-note">התשובות לשאלות שמורות רק אצלכם ואחרים לא רואים אותן. רק השם שבחרתם מוצג לאחרים.</p>
-    <p class="ob-note" id="obGuest" hidden>אפשר להירשם גם בלי חשבון, והפרופיל יישמר בדפדפן הזה. כדי לשמור דירוגים ולהסכים עם דירוגים של אחרים צריך להתחבר עם Google (בראש הדף).</p>
-    <p class="ob-note latin" id="obUid" hidden style="direction:ltr; text-align:right; font-family: var(--mono)"></p>
+    <p class="ob-note" id="obGuest" hidden>אין צורך בסיסמה או באימייל. הדפדפן שלכם מקבל קוד אישי שמזהה אתכם באתר, ואפשר להעתיק אותו למכשיר אחר דרך "שינוי פרופיל".</p>
+    <div class="acct" id="acctBox" hidden>
+      <div class="field" id="myCodeRow">
+        <label for="myCode">הקוד האישי שלכם</label>
+        <span class="hint">הקוד מזהה אתכם באתר. שמרו אותו כדי להמשיך מאותו חשבון במחשב או בטלפון אחר, ואל תשתפו אותו.</span>
+        <div class="acct-row"><input type="text" id="myCode" readonly dir="ltr"><button type="button" class="btn" id="copyCode">העתק</button></div>
+      </div>
+      <div class="field">
+        <label for="restoreCode">יש לכם קוד ממכשיר אחר?</label>
+        <div class="acct-row"><input type="text" id="restoreCode" dir="ltr" placeholder="הדביקו כאן את הקוד" autocomplete="off"><button type="button" class="btn" id="restoreBtn">התחבר עם הקוד</button></div>
+      </div>
+      <p class="ob-err" id="restoreErr" hidden></p>
+    </div>
   </form>
 
   <!-- ===== Calculator tab ===== -->
@@ -579,10 +583,6 @@ img { max-width: 100%; }
         </select>
       </div>
     </div>
-    <div class="admin-tools" id="adminTools" hidden>
-      <span>כלי מנהל: הספרייה ריקה מדירוגי פתיחה.</span>
-      <button type="button" class="btn" id="seedBtn">טען 11 דירוגי פתיחה</button>
-    </div>
     <p class="lib-msg" id="libMsg">טוען את הספרייה…</p>
     <ul class="shelf" id="shelf"></ul>
   </section>
@@ -627,9 +627,8 @@ img { max-width: 100%; }
 
 
 <script type="module">
-import { firebaseConfig } from './firebase-config.js';
+import { SUPABASE_URL, SUPABASE_KEY } from './supabase-config.js';
 
-const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
 const $ = (id) => document.getElementById(id);
 const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -671,22 +670,6 @@ const PROFILES = [
 ];
 const profileFor = (pts) => PROFILES.find((p) => pts >= p.minPts);
 const profileByI = (I) => PROFILES.find((p) => p.I === I) || PROFILES[0];
-
-// Starter ratings (admin can load them once)
-const STARTER = [
-  ['starter-hp1', 'הארי פוטר ואבן החכמים', { pages: 320, pov: 5, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
-  ['starter-hp6', 'הארי פוטר והנסיך חצוי הדם', { pages: 650, pov: 5, percentage: 0.02, unexpected: 1, apathy: 4, mainEvents: 3, mainExplicit: 1, mainInitiative: 2, secondary: [{ ev: 4, ex: 1, ini: 1 }] }],
-  ['starter-hunger', 'משחקי הרעב', { pages: 380, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 5, mainExplicit: 1, mainInitiative: 1, secondary: [] }],
-  ['starter-twilight', 'דמדומים', { pages: 500, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 4, mainExplicit: 1, mainInitiative: 3, secondary: [] }],
-  ['starter-pride', 'גאווה ודעה קדומה', { pages: 430, pov: 5, percentage: 0.02, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [{ ev: 1, ex: 1, ini: 3 }] }],
-  ['starter-prince', 'הנסיך הקטן', { pages: 96, pov: 3, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
-  ['starter-1984', '1984', { pages: 330, pov: 5, percentage: 0.1, unexpected: 1, apathy: 3, mainEvents: 4, mainExplicit: 2, mainInitiative: 2, secondary: [{ ev: 4, ex: 2, ini: 3 }] }],
-  ['starter-annefrank', 'יומנה של אנה פרנק', { pages: 340, pov: 3, percentage: 0.02, unexpected: 1, apathy: 4, mainEvents: 3, mainExplicit: 1, mainInitiative: 2, secondary: [] }],
-  ['starter-lotr1', 'שר הטבעות: אחוות הטבעת', { pages: 480, pov: 5, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
-  ['starter-catcher', 'התפסן בשדה השיפון', { pages: 230, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 2, mainExplicit: 1, mainInitiative: 1, secondary: [] }],
-  ['starter-50shades', 'חמישים גוונים של אפור', { pages: 520, pov: 3, percentage: 0.45, unexpected: 1, apathy: 1, mainEvents: 15, mainExplicit: 3, mainInitiative: 2, secondary: [] }]
-];
-const STARTER_UID = 'sbook-starter';
 
 let me = { nickname: '', I: 1.0, answers: null };
 let appReady = false;
@@ -748,9 +731,7 @@ function showOnboarding(isEdit) {
   hideViews(); $('tabs').hidden = true; $('whoBar').hidden = true;
   $('onboard').hidden = false;
   $('obErr').hidden = true;
-  $('obGuest').hidden = !!uid || !fs;
-  $('obUid').hidden = !(isEdit && uid);
-  if (uid) $('obUid').textContent = `מזהה המשתמש שלכם (למנהל האתר): ${uid}`;
+  paintAccount(isEdit);
   $('obTitle').textContent = isEdit ? 'עדכון פרופיל הקורא' : 'הרשמה לאתר';
   $('obIntro').textContent = isEdit
     ? 'אפשר לשנות את השם או לענות מחדש על השאלות. הפרופיל החדש ישפיע על כל הציונים שמוצגים לכם.'
@@ -798,7 +779,7 @@ $('onboard').addEventListener('submit', async (e) => {
   saveLocal();
   savingProfile = true; $('obSubmit').disabled = true;
   let note = '';
-  try { if (uid) await saveProfileRemote(); }
+  try { if (sb) { await ensureMember(); await saveProfileRemote(); } }
   catch (e2) { note = 'לא הצלחנו לשמור את הפרופיל בחשבון. הוא נשמר בינתיים בדפדפן הזה.'; }
   finally { savingProfile = false; $('obSubmit').disabled = false; }
   enterApp();
@@ -1083,16 +1064,86 @@ $('copyBtn').addEventListener('click', () => {
   } catch (e) { fallback(); }
 });
 
-// ---------- Firebase state ----------
-let fb = null;            // { app, auth, fs, api }
-let fs = null;            // firestore instance (null = offline mode)
-let uid = null, isAdmin = false;
+// ---------- Supabase state ----------
+let sb = null;            // supabase client (null = offline mode)
+let secret = null;        // this browser's personal code
+let memberId = null, isAdmin = false;
 let ratings = [];
 let readers = {};
 let likesByUser = {};
 let libLoaded = false;
 let editingId = null;
 let confirmId = null;
+
+const SECRET_KEY = 'sbook-secret';
+function loadSecret() { try { return localStorage.getItem(SECRET_KEY); } catch (e) { return null; } }
+function storeSecret(s) { try { localStorage.setItem(SECRET_KEY, s); } catch (e) {} }
+function newSecret() {
+  const b = new Uint8Array(24); crypto.getRandomValues(b);
+  return 'sb-' + [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+}
+
+async function rpc(name, args) {
+  const { data, error } = await sb.rpc(name, args);
+  if (error) { const e = new Error(error.message); e.code = error.code; throw e; }
+  return data;
+}
+
+async function ensureMember() {
+  if (memberId) return memberId;
+  if (!secret) { secret = newSecret(); storeSecret(secret); }
+  memberId = await rpc('register', { p_secret: secret });
+  paintAccount(false);
+  return memberId;
+}
+
+async function saveProfileRemote() {
+  await rpc('save_profile', { p_secret: secret, p_nickname: me.nickname, p_i: me.I, p_answers: me.answers || {} });
+  readers[memberId] = me.nickname;
+}
+
+function paintAccount(isEdit) {
+  $('obGuest').hidden = !sb || !!memberId;
+  $('acctBox').hidden = !sb || !(isEdit || location.hash === '#admin');
+  $('myCodeRow').hidden = !secret || !memberId;
+  if (secret) $('myCode').value = secret;
+  $('adminChip').hidden = !isAdmin;
+}
+
+$('copyCode').addEventListener('click', () => {
+  const el = $('myCode');
+  try { navigator.clipboard.writeText(el.value).then(() => { $('copyCode').textContent = 'הועתק'; }, () => { el.select(); }); }
+  catch (e) { el.select(); }
+});
+
+$('restoreBtn').addEventListener('click', async () => {
+  const code = $('restoreCode').value.trim();
+  const err = $('restoreErr');
+  err.hidden = true;
+  if (!sb || code.length < 32) { err.textContent = 'הקוד קצר מדי. העתיקו אותו במלואו.'; err.hidden = false; return; }
+  $('restoreBtn').disabled = true;
+  try {
+    const meRow = await rpc('get_me', { p_secret: code });
+    if (!meRow) { err.textContent = 'הקוד הזה לא נמצא. בדקו שהעתקתם אותו נכון.'; err.hidden = false; return; }
+    secret = code; storeSecret(code);
+    applyMe(meRow);
+    saveLocal();
+    $('restoreCode').value = '';
+    if (location.hash === '#admin') history.replaceState(null, '', '#calc');
+    if (serverProfile) enterApp(); else showOnboarding(false);
+  } catch (e) {
+    err.textContent = 'לא הצלחנו לבדוק את הקוד כרגע. נסו שוב.'; err.hidden = false;
+  } finally { $('restoreBtn').disabled = false; }
+});
+
+let serverProfile = false;
+function applyMe(row) {
+  memberId = row.id;
+  isAdmin = !!row.is_admin;
+  if (row.nickname) readers[memberId] = row.nickname;
+  serverProfile = row.i != null && adoptProfile({ nickname: row.nickname || me.nickname, I: Number(row.i), answers: row.answers });
+  paintAccount(false);
+}
 
 const normTitle = (s) => String(s || '').normalize('NFC').toLowerCase()
   .replace(/["'״׳`.,:;!?()\[\]\-–—_]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -1143,7 +1194,7 @@ function model() {
     g.max = Math.max(...g.items.map((x) => x.r.book));
     g.vetoCount = g.items.filter((x) => x.r.veto).length;
     g.lastAt = g.items.reduce((m, x) => { const t = String(x.data.updatedAt || x.data.createdAt || ''); return t > m ? t : m; }, '');
-    g.mine = g.items.find((x) => uid && x.by === uid) || null;
+    g.mine = g.items.find((x) => memberId && x.by === memberId) || null;
     g.items.sort((a, b) => (b.trust * 10 + b.likes) - (a.trust * 10 + a.likes) || String(b.data.updatedAt || '').localeCompare(String(a.data.updatedAt || '')));
   });
   return groups;
@@ -1157,7 +1208,7 @@ const fmtDate = (iso) => {
 };
 
 function raterName(u) {
-  if (uid && u === uid) return `${me.nickname || readers[u] || 'אתם'} (אתם)`;
+  if (memberId && u === memberId) return `${me.nickname || readers[u] || 'אתם'} (אתם)`;
   return readers[u] || 'קורא/ת';
 }
 
@@ -1167,7 +1218,6 @@ function renderAll() {
   const dl = $('knownTitles');
   dl.innerHTML = '';
   groupsCache.forEach((g) => { const o = document.createElement('option'); o.value = g.title; dl.appendChild(o); });
-  $('adminTools').hidden = !(isAdmin && libLoaded && !ratings.some((d) => d.id.startsWith('starter-')));
   if (!appReady) return;
   if (!$('viewLib').hidden) renderLibrary();
   if (!$('viewBook').hidden) renderBook(currentBookKey);
@@ -1177,7 +1227,7 @@ function renderAll() {
 // ---------- Library view ----------
 function renderLibrary() {
   const shelf = $('shelf'), msg = $('libMsg');
-  if (!fs) {
+  if (!sb) {
     shelf.innerHTML = '';
     msg.hidden = false;
     msg.textContent = 'הספרייה עוד לא מחוברת למסד נתונים. המחשבון עובד גם בלי זה.';
@@ -1246,7 +1296,7 @@ function renderBook(key) {
   if (!g) {
     $('bookBody').hidden = true;
     msg.hidden = false;
-    msg.textContent = (!libLoaded && fs) ? 'טוען את הספר…' : 'הספר הזה לא נמצא בספרייה. ייתכן שהדירוגים שלו נמחקו.';
+    msg.textContent = (!libLoaded && sb) ? 'טוען את הספר…' : 'הספר הזה לא נמצא בספרייה. ייתכן שהדירוגים שלו נמחקו.';
     return;
   }
   msg.hidden = true; $('bookBody').hidden = false;
@@ -1267,7 +1317,7 @@ function renderBook(key) {
 
   const list = $('ratingsList');
   list.innerHTML = '';
-  const myLikes = (uid && likesByUser[uid]) || new Set();
+  const myLikes = (memberId && likesByUser[memberId]) || new Set();
   g.items.forEach((x) => {
     const li = document.createElement('li');
     li.className = 'rating';
@@ -1291,7 +1341,7 @@ function renderBook(key) {
     if (x.r.veto) { const w = document.createElement('span'); w.className = 'chip warn'; w.textContent = '⚠ תוכן מפורש'; li.querySelector('.chips').appendChild(w); }
 
     const actions = li.querySelector('.rating-actions');
-    const mine = uid && x.by === uid;
+    const mine = memberId && x.by === memberId;
     const canModify = mine || isAdmin;
 
     if (confirmId === x.id) {
@@ -1311,11 +1361,8 @@ function renderBook(key) {
       like.append(liked ? 'מסכים/ה ✓' : 'מסכים/ה');
       const c = document.createElement('span'); c.className = 'c'; c.textContent = x.likes; like.appendChild(c);
       if (mine) { like.disabled = true; like.title = 'אי אפשר להסכים עם דירוג של עצמכם'; }
-      else if (!fs) { like.disabled = true; }
-      like.addEventListener('click', () => {
-        if (!uid) { requireSignIn('כדי להסכים עם דירוגים צריך להתחבר.'); return; }
-        toggleLike(x.id);
-      });
+      else if (!sb) { like.disabled = true; }
+      like.addEventListener('click', () => toggleLike(x.id, !liked));
       actions.appendChild(like);
 
       const load = document.createElement('button'); load.type = 'button'; load.className = 'link';
@@ -1351,73 +1398,29 @@ $('rateThis').addEventListener('click', () => {
   location.hash = 'calc';
 });
 
-// ---------- Auth helpers ----------
-function requireSignIn(msg) {
-  if (!fs) return;
-  if (!$('viewCalc').hidden) status(msg, true, { text: 'התחברות עם Google', onClick: signIn });
-  else { alertInline(msg); }
-}
-function alertInline(msg) {
-  const el = $('bookMsg').hidden ? $('libMsg') : $('bookMsg');
-  const box = document.createElement('p');
-  box.className = 'notice';
-  box.textContent = msg + ' ';
-  const b = document.createElement('button'); b.type = 'button'; b.className = 'link'; b.textContent = 'התחברות עם Google';
-  b.addEventListener('click', signIn);
-  box.appendChild(b);
+function inlineError(msg) {
   const host = $('viewBook').hidden ? $('viewLib') : $('viewBook');
-  const old = host.querySelector('.notice.signin'); if (old) old.remove();
-  box.classList.add('signin');
+  const old = host.querySelector('.notice.inline-err'); if (old) old.remove();
+  const box = document.createElement('p');
+  box.className = 'notice inline-err';
+  box.textContent = msg;
   host.insertBefore(box, host.children[1] || null);
-}
-
-async function signIn() {
-  if (!fb) return;
-  const { auth, api } = fb;
-  const provider = new api.GoogleAuthProvider();
-  try {
-    await api.signInWithPopup(auth, provider);
-  } catch (e) {
-    const code = e && e.code;
-    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
-      try { await api.signInWithRedirect(auth, provider); } catch (e2) { status('ההתחברות לא הצליחה. נסו שוב.', true); }
-    } else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
-      status('ההתחברות לא הצליחה. נסו שוב.', true);
-    }
-  }
-}
-$('signInBtn').addEventListener('click', signIn);
-$('signOutBtn').addEventListener('click', async () => { if (fb) await fb.api.signOut(fb.auth); });
-
-function paintAuth(u) {
-  $('authBox').hidden = !fs;
-  $('signInBtn').hidden = !!u;
-  $('signOutBtn').hidden = !u;
-  $('authState').textContent = u ? `מחוברים${u.email ? ' כ-' + u.email : ''}` : 'אורחים: אפשר לעיין ולחשב. כדי לדרג צריך להתחבר.';
-  $('adminChip').hidden = !isAdmin;
-}
-
-async function saveProfileRemote() {
-  const { api } = fb;
-  const now = new Date().toISOString();
-  await api.setDoc(api.doc(fs, 'profiles', uid), { nickname: me.nickname, I: me.I, answers: me.answers || {}, updatedAt: now });
-  await api.setDoc(api.doc(fs, 'readers', uid), { nickname: me.nickname, updatedAt: now });
+  setTimeout(() => box.remove(), 6000);
 }
 
 // ---------- Likes ----------
 let likeChain = Promise.resolve();
-function toggleLike(ratingId) {
-  if (!fs || !uid) return;
+function toggleLike(ratingId, on) {
+  if (!sb) return;
   likeChain = likeChain.then(async () => {
-    const set = new Set(likesByUser[uid] || []);
-    if (set.has(ratingId)) set.delete(ratingId); else set.add(ratingId);
-    const alive = new Set(ratings.map((d) => d.id));
-    const liked = {};
-    set.forEach((id) => { if (alive.has(id)) liked[id] = true; });
     try {
-      await fb.api.setDoc(fb.api.doc(fs, 'likes', uid), { liked, updatedAt: new Date().toISOString() });
+      await ensureMember();
+      await rpc('set_like', { p_secret: secret, p_rating: ratingId, p_on: on });
+      const set = likesByUser[memberId] || (likesByUser[memberId] = new Set());
+      if (on) set.add(ratingId); else set.delete(ratingId);
+      renderAll();
     } catch (e) {
-      renderBook(currentBookKey);
+      inlineError('לא הצלחנו לשמור את ההסכמה. נסו שוב.');
     }
   });
 }
@@ -1435,81 +1438,55 @@ $('stopEditing').addEventListener('click', () => { setEditing(null); status('ה�
 
 async function removeRating(x) {
   try {
-    await fb.api.deleteDoc(fb.api.doc(fs, 'books', x.id));
+    await rpc('delete_rating', { p_secret: secret, p_id: x.id });
     if (editingId === x.id) setEditing(null);
     confirmId = null;
+    ratings = ratings.filter((d) => d.id !== x.id);
+    renderAll();
   } catch (e) {
     confirmId = null;
     renderBook(currentBookKey);
-    alertInline('המחיקה לא הצליחה. ייתכן שאין לכם הרשאה למחוק את הדירוג הזה.');
+    inlineError('המחיקה לא הצליחה. ייתכן שאין לכם הרשאה למחוק את הדירוג הזה.');
   }
 }
 
 let saving = false;
 $('saveBtn').addEventListener('click', async () => {
   if (saving) return;
-  if (!fs) { status('הספרייה עוד לא מחוברת למסד נתונים.', true); return; }
-  if (!uid) { status('כדי לשמור בספרייה צריך להתחבר.', true, { text: 'התחברות עם Google', onClick: signIn }); return; }
+  if (!sb) { status('הספרייה עוד לא מחוברת למסד נתונים.', true); return; }
   const { inp, r } = current;
   if (!inp.title) { status('כדי לשמור בספרייה צריך למלא את שם הספר.', true); $('bookTitle').focus(); return; }
-
-  let targetId = editingId;
-  if (!targetId) {
-    const g = groupsCache.get(bookKey(inp.title));
-    if (g && g.mine) targetId = g.mine.id;
-  }
-  const existing = targetId ? ratings.find((d) => d.id === targetId) : null;
-  const now = new Date().toISOString();
-  const { title, ...inputs } = inp;
-  const body = {
-    title, score: Number(r.book.toFixed(2)), rawScore: Number(r.raw.toFixed(5)), veto: r.veto, inputs,
-    createdBy: existing ? existing.data.createdBy : uid,
-    createdAt: (existing && existing.data.createdAt) || now, updatedAt: now
-  };
   saving = true; $('saveBtn').disabled = true;
   try {
-    const { api } = fb;
-    let id = targetId;
-    if (existing) await api.setDoc(api.doc(fs, 'books', targetId), body);
-    else { const ref = await api.addDoc(api.collection(fs, 'books'), body); id = ref.id; }
-    setEditing(id, title, existing && existing.data.createdBy !== uid);
+    await ensureMember();
+    if (!readers[memberId] && me.nickname) await saveProfileRemote();
+    let targetId = editingId;
+    if (!targetId) {
+      const g = groupsCache.get(bookKey(inp.title));
+      if (g && g.mine) targetId = g.mine.id;
+    }
+    const existing = targetId ? ratings.find((d) => d.id === targetId) : null;
+    const { title, ...inputs } = inp;
+    const id = await rpc('save_rating', {
+      p_secret: secret, p_id: existing ? targetId : null, p_title: title, p_inputs: inputs,
+      p_score: Number(r.book.toFixed(2)), p_raw: Number(r.raw.toFixed(5)), p_veto: r.veto
+    });
+    setEditing(id, title, existing && existing.data.createdBy !== memberId);
+    await loadAll();
     status(existing ? `"${title}" עודכן בספרייה.` : `"${title}" נשמר בספרייה.`, false, { href: '#book-' + bookKey(title), text: 'לעמוד הספר ←' });
   } catch (e) {
-    if (e && e.code === 'permission-denied') status('אין לכם הרשאה לשמור את הדירוג הזה.', true);
-    else if (e && e.code === 'resource-exhausted') status('הגענו למכסה היומית של האתר. נסו שוב מחר.', true);
+    if (e && e.code === '42501') status('אין לכם הרשאה לשמור את הדירוג הזה.', true);
     else status('השמירה לא הצליחה כרגע. נסו שוב בעוד רגע.', true);
   } finally {
     saving = false; $('saveBtn').disabled = false;
   }
 });
 
-// Admin: load starter ratings once
-$('seedBtn').addEventListener('click', async () => {
-  if (!isAdmin) return;
-  $('seedBtn').disabled = true;
-  try {
-    const { api } = fb;
-    const batch = api.writeBatch(fs);
-    batch.set(api.doc(fs, 'readers', STARTER_UID), { nickname: 'דירוג פתיחה של האתר', updatedAt: new Date().toISOString() });
-    STARTER.forEach(([id, title, inputs], i) => {
-      const inp = clean({ ...inputs, title });
-      const r = compute(inp);
-      const t = new Date(Date.UTC(2026, 10, 17, 10, 0, i + 1)).toISOString();
-      batch.set(api.doc(fs, 'books', id), {
-        title, score: Number(r.book.toFixed(2)), rawScore: Number(r.raw.toFixed(5)), veto: r.veto,
-        inputs, createdBy: STARTER_UID, createdAt: t, updatedAt: t
-      });
-    });
-    await batch.commit();
-  } catch (e) {
-    alertInline('הטעינה לא הצליחה. ודאו שאתם מוגדרים כמנהלים ושכללי האבטחה פורסמו.');
-  } finally { $('seedBtn').disabled = false; }
-});
-
 // ---------- Routing ----------
 function route() {
-  if (!appReady) return;
   const h = (location.hash || '').slice(1);
+  if (h === 'admin' && sb) { showOnboarding(true); $('obTitle').textContent = 'כניסת מנהל / שחזור חשבון'; $('obIntro').textContent = 'הדביקו את הקוד האישי שלכם (או את קוד המנהל) בשדה "יש לכם קוד ממכשיר אחר" ולחצו "התחבר עם הקוד".'; $('restoreCode').focus(); return; }
+  if (!appReady) return;
   hideViews();
   document.title = 'מדד ה-S-Book';
   let tab = 'calc';
@@ -1533,89 +1510,78 @@ function route() {
 }
 window.addEventListener('hashchange', route);
 
-// ---------- Boot ----------
-function subscribe() {
-  const { api } = fb;
-  const timer = setTimeout(() => {
-    if (!libLoaded) $('libMsg').textContent = 'לא מצליחים להגיע לספרייה כרגע. הנתונים יופיעו כשהחיבור יחזור.';
-  }, 10000);
-
-  api.onSnapshot(api.collection(fs, 'books'), (snap) => {
-    libLoaded = true; clearTimeout(timer);
-    ratings = snap.docs.map((d) => ({ id: d.id, data: d.data() || {} }));
-    renderAll();
-  }, () => {
-    libLoaded = true; clearTimeout(timer);
-    $('libMsg').hidden = false;
-    $('libMsg').textContent = 'הספרייה לא זמינה כרגע. רעננו את הדף מאוחר יותר.';
-  });
-
-  api.onSnapshot(api.collection(fs, 'readers'), (snap) => {
-    const m = {};
-    snap.docs.forEach((d) => {
-      const n = d.data() && d.data().nickname;
-      if (typeof n === 'string' && n.trim()) m[d.id] = n.trim().slice(0, 40);
-    });
-    readers = m;
-    renderAll();
-  }, () => {});
-
-  api.onSnapshot(api.collection(fs, 'likes'), (snap) => {
-    const m = {};
-    snap.docs.forEach((d) => {
-      const liked = d.data() && d.data().liked;
-      const set = new Set();
-      if (liked && typeof liked === 'object') Object.keys(liked).slice(0, 5000).forEach((k) => { if (liked[k] === true) set.add(k); });
-      m[d.id] = set;
-    });
-    likesByUser = m;
-    renderAll();
-  }, () => {});
+// ---------- Data loading ----------
+async function loadAll() {
+  const [r1, r2, r3] = await Promise.all([
+    sb.from('ratings').select('id,title,inputs,veto,created_by,created_at,updated_at').limit(5000),
+    sb.from('readers').select('id,nickname').limit(5000),
+    sb.from('likes').select('member_id,rating_id').limit(20000)
+  ]);
+  if (r1.error) throw r1.error;
+  ratings = (r1.data || []).map((d) => ({
+    id: d.id,
+    data: { title: d.title, inputs: d.inputs, veto: d.veto, createdBy: d.created_by || '', createdAt: d.created_at, updatedAt: d.updated_at }
+  }));
+  const m = {};
+  (r2.data || []).forEach((d) => { if (typeof d.nickname === 'string' && d.nickname.trim()) m[d.id] = d.nickname.trim().slice(0, 40); });
+  readers = m;
+  const lk = {};
+  (r3.data || []).forEach((d) => { (lk[d.member_id] || (lk[d.member_id] = new Set())).add(d.rating_id); });
+  likesByUser = lk;
+  libLoaded = true;
+  renderAll();
 }
 
+let lastLoad = 0;
+async function refresh() {
+  if (!sb || Date.now() - lastLoad < 15000) return;
+  lastLoad = Date.now();
+  try { await loadAll(); } catch (e) { /* keep showing what we have */ }
+}
+
+// ---------- Boot ----------
 async function boot() {
-  if (!firebaseConfig) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) {
     $('offlineNote').hidden = false;
     if (adoptProfile(loadLocal())) enterApp(); else showOnboarding(false);
     return;
   }
   try {
-    const [appMod, authMod, fsMod] = await Promise.all([
-      import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')
-    ]);
-    const app = appMod.initializeApp(firebaseConfig);
-    const auth = authMod.getAuth(app);
-    fs = fsMod.getFirestore(app);
-    fb = { app, auth, api: { ...authMod, ...fsMod } };
+    const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
+    sb = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
   } catch (e) {
-    fs = null; fb = null;
+    sb = null;
     $('offlineNote').hidden = false;
     $('offlineNote').textContent = 'לא הצלחנו להתחבר לספרייה. המחשבון עובד, נסו לרענן מאוחר יותר.';
     if (adoptProfile(loadLocal())) enterApp(); else showOnboarding(false);
     return;
   }
-  subscribe();
-  fb.api.getRedirectResult(fb.auth).catch(() => {});
 
-  fb.api.onAuthStateChanged(fb.auth, async (u) => {
-    uid = u ? u.uid : null;
-    isAdmin = false;
-    let profile = null;
-    if (u) {
-      try { isAdmin = (await fb.api.getDoc(fb.api.doc(fs, 'admins', uid))).exists(); } catch (e) {}
-      try { const p = await fb.api.getDoc(fb.api.doc(fs, 'profiles', uid)); if (p.exists()) profile = p.data(); } catch (e) {}
-    }
-    paintAuth(u);
-    if (adoptProfile(profile)) {
-      saveLocal();
-      enterApp();
-    } else if (adoptProfile(loadLocal())) {
-      if (u && me.nickname) { try { await saveProfileRemote(); } catch (e) {} }
-      enterApp();
-    } else {
-      showOnboarding(false);
-    }
-  });
+  const timer = setTimeout(() => {
+    if (!libLoaded) $('libMsg').textContent = 'לא מצליחים להגיע לספרייה כרגע. נסו לרענן בעוד רגע.';
+  }, 10000);
+  lastLoad = Date.now();
+  loadAll().catch(() => {
+    $('libMsg').hidden = false;
+    $('libMsg').textContent = 'הספרייה לא זמינה כרגע. רעננו את הדף מאוחר יותר.';
+  }).finally(() => clearTimeout(timer));
+
+  secret = loadSecret();
+  if (secret) {
+    try { const row = await rpc('get_me', { p_secret: secret }); if (row) applyMe(row); } catch (e) {}
+  }
+  const local = loadLocal();
+  if (serverProfile) { saveLocal(); enterApp(); }
+  else if (adoptProfile(local)) {
+    if (memberId && me.nickname) { try { await saveProfileRemote(); } catch (e) {} }
+    enterApp();
+  } else {
+    showOnboarding(false);
+  }
+  if (location.hash === '#admin') route();
+
+  window.addEventListener('focus', refresh);
+  setInterval(() => { if (!document.hidden) refresh(); }, 60000);
 }
 
 // ---------- Wiring ----------

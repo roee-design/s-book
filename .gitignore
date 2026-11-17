@@ -1,0 +1,5 @@
+.supabase-token
+ADMIN-KEY.txt
+*.local
+supabase/SETUP-run-once.sql
+.mcp.json
