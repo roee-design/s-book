@@ -1,0 +1,1640 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>מדד ה-S-Book</title>
+<meta name="description" content="מחשבון וספרייה לדירוג רמת המיניות בספרים, מותאם לפרופיל הקורא.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%232b4a7e'/%3E%3Cpath d='M9 8h6a3 3 0 0 1 3 3v13a2 2 0 0 0-2-2H9zM23 8h-3v14h3z' fill='%23fdfdfb'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: header + two tabs (calculator / library). Sign-up questionnaire gates the app. Calculator: form + sticky "library card" result. Library: book shelf -> book page with averaged, trust-weighted score and the individual ratings. */
+:root {
+  --paper: #f3f4f1;
+  --card: #fdfdfb;
+  --sunk: #e9ebe6;
+  --ink: #1d2422;
+  --muted: #5d6763;
+  --line: #d5d9d3;
+  --accent: #2b4a7e;        /* library-binding blue */
+  --accent-soft: #e3e9f3;
+  --panel: #1f2b3d;
+  --panel-ink: #f2f4f7;
+  --panel-muted: #a9b4c4;
+  --safe: #2f8a5b;
+  --mild: #c99316;
+  --mod: #d46a1f;
+  --high: #c23a32;
+  --danger-bg: #f8e3e1;
+  --danger-ink: #a5302a;
+  --display: "Frank Ruhl Libre", "David", "Times New Roman", serif;
+  --body: "Assistant", "Segoe UI", "Arial Hebrew", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+  --radius: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper: #141a1f; --card: #1b2228; --sunk: #232b32; --ink: #e8ecea; --muted: #9aa5a2;
+    --line: #313b42; --accent: #8fb0e6; --accent-soft: #24324a; --panel: #0e1520;
+    --panel-ink: #eef1f5; --panel-muted: #9aa7ba; --safe: #4cb37f; --mild: #e0ae3a;
+    --mod: #ec8a45; --high: #e5605a; --danger-bg: #3a2222; --danger-ink: #f0a39e;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --paper: #141a1f; --card: #1b2228; --sunk: #232b32; --ink: #e8ecea; --muted: #9aa5a2;
+  --line: #313b42; --accent: #8fb0e6; --accent-soft: #24324a; --panel: #0e1520;
+  --panel-ink: #eef1f5; --panel-muted: #9aa7ba; --safe: #4cb37f; --mild: #e0ae3a;
+  --mod: #ec8a45; --high: #e5605a; --danger-bg: #3a2222; --danger-ink: #f0a39e;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body { background: var(--paper); color: var(--ink); font-family: var(--body); font-size: 16px; line-height: 1.6; }
+.page {
+  max-width: 1120px; margin: 0 auto;
+  padding-block: 40px 56px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 28px;
+}
+
+header.top { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 16px; }
+.top-text { display: grid; gap: 8px; max-width: 62ch; }
+.eyebrow { font-size: 0.8rem; font-weight: 700; letter-spacing: 0.08em; color: var(--accent); }
+h1 { font-family: var(--display); font-weight: 900; font-size: clamp(2.2rem, 5vw, 3.2rem); line-height: 1.1; margin: 0; text-wrap: balance; }
+.latin { direction: ltr; unicode-bidi: isolate; }
+.lede { color: var(--muted); font-size: 1.1rem; margin: 0; }
+.who { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 0.92rem; color: var(--muted); }
+.who b { color: var(--ink); }
+.ichip { font-family: var(--mono); font-size: 0.8rem; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 10px; }
+.admin-chip { font-size: 0.8rem; font-weight: 700; background: var(--ink); color: var(--paper); border-radius: 999px; padding: 1px 10px; }
+.boot { color: var(--muted); margin: 0; }
+
+/* Tabs */
+.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); overflow-x: auto; }
+.tab {
+  font-family: var(--display); font-weight: 700; font-size: 1.15rem; text-decoration: none; color: var(--muted);
+  padding: 10px 18px 12px; border-bottom: 3px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tab:hover { color: var(--ink); }
+.tab[aria-current="page"] { color: var(--accent); border-bottom-color: var(--accent); }
+.tab .n { font-family: var(--mono); font-size: 0.85rem; font-weight: 500; background: var(--sunk); color: var(--muted); border-radius: 999px; padding: 0 8px; margin-inline-start: 6px; }
+
+/* Onboarding */
+.onboard {
+  max-width: 680px; width: 100%; justify-self: center;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 28px; display: grid; gap: 22px;
+}
+.onboard h2 { font-family: var(--display); font-weight: 900; font-size: 1.8rem; margin: 0; line-height: 1.15; text-wrap: balance; }
+.onboard .intro { margin: 6px 0 0; color: var(--muted); }
+.q { border: none; margin: 0; padding: 0; display: grid; gap: 8px; min-width: 0; }
+.q legend { font-weight: 700; padding: 0; margin-bottom: 8px; }
+.q legend .qn { font-family: var(--mono); color: var(--accent); margin-inline-end: 6px; font-weight: 500; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.opt { position: relative; }
+.opt input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.opt span {
+  display: block; height: 100%; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px;
+  font-size: 0.94rem; cursor: pointer; background: var(--card);
+}
+.opt input:checked + span { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.opt input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 2px; }
+.verdict { background: var(--sunk); border-radius: 8px; padding: 14px 16px; display: grid; gap: 2px; }
+.verdict b { font-family: var(--display); font-size: 1.15rem; }
+.verdict .vi { font-family: var(--mono); color: var(--accent); }
+.verdict p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+.ob-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+.btn-solid {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px; padding: 11px 22px;
+  border: 1px solid var(--accent); background: var(--accent); color: var(--card); text-decoration: none; display: inline-block;
+}
+.btn-solid:disabled { opacity: 0.5; cursor: not-allowed; }
+.ob-note { font-size: 0.85rem; color: var(--muted); margin: 0; }
+.ob-err { color: var(--danger-ink); font-weight: 600; font-size: 0.92rem; margin: 0; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 28px; align-items: start; }
+.form-col { display: grid; gap: 20px; min-width: 0; }
+
+.section {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 24px; display: grid; gap: 18px; min-width: 0;
+}
+.section-head { display: flex; align-items: baseline; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.step { font-family: var(--display); font-weight: 700; font-size: 1.6rem; color: var(--accent); line-height: 1; }
+.section h2 { font-family: var(--display); font-weight: 700; font-size: 1.3rem; margin: 0; }
+.section h2 .sym { font-family: var(--mono); font-size: 0.95rem; color: var(--muted); font-weight: 400; }
+.section-note { color: var(--muted); font-size: 0.92rem; margin: -6px 0 0; }
+
+.editing {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+  background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 10px 14px; font-weight: 600;
+}
+.editing .link { margin-inline-start: auto; }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+.field { display: grid; gap: 4px; align-content: start; min-width: 0; }
+.field label { font-weight: 700; font-size: 0.95rem; }
+.field label .sym { font-family: var(--mono); font-weight: 500; color: var(--accent); font-size: 0.85rem; margin-inline-start: 4px; }
+.hint { font-size: 0.84rem; color: var(--muted); }
+
+input[type="number"], input[type="text"], input[type="search"], select, textarea {
+  width: 100%; padding: 10px 12px; font: inherit; font-size: 1rem;
+  color: var(--ink); background: var(--card);
+  border: 1px solid var(--line); border-radius: 8px;
+}
+input[type="number"] { font-variant-numeric: tabular-nums; }
+input:focus-visible, select:focus-visible, button:focus-visible, textarea:focus-visible, a:focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px;
+}
+
+.derived {
+  font-size: 0.88rem; color: var(--accent); background: var(--accent-soft);
+  border-radius: 8px; padding: 8px 12px; font-variant-numeric: tabular-nums;
+}
+
+.btn {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px;
+  border: 1px solid var(--accent); background: transparent; color: var(--accent);
+  padding: 9px 16px; justify-self: start; text-decoration: none; display: inline-block;
+}
+.btn:hover { background: var(--accent-soft); }
+.link {
+  font: inherit; font-weight: 600; font-size: 0.9rem; cursor: pointer;
+  background: none; border: none; padding: 2px 0; color: var(--accent); text-decoration: underline;
+}
+.link.danger { color: var(--danger-ink); }
+.btn-remove {
+  font: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  border: none; border-radius: 6px; padding: 4px 10px;
+  background: var(--danger-bg); color: var(--danger-ink);
+}
+
+.chars { display: grid; gap: 12px; }
+.chars:empty { display: none; }
+.char-box { background: var(--sunk); border-radius: 8px; padding: 16px; display: grid; gap: 14px; }
+.char-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.char-head strong { font-family: var(--display); font-size: 1.05rem; }
+.grid-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.empty-note { color: var(--muted); font-size: 0.92rem; border: 1px dashed var(--line); border-radius: 8px; padding: 12px 14px; margin: 0; }
+
+/* Dark "library card" panel (calculator result + book summary) */
+.panel {
+  background: var(--panel); color: var(--panel-ink); border-radius: var(--radius);
+  padding: 24px; display: grid; gap: 16px; align-content: start;
+}
+.result { position: sticky; top: calc(env(safe-area-inset-top, 0px) + 20px); }
+.result-label { font-size: 0.8rem; letter-spacing: 0.08em; font-weight: 700; color: var(--panel-muted); }
+.result-title { font-family: var(--display); font-size: 1.15rem; font-weight: 700; margin: 2px 0 0; overflow-wrap: anywhere; }
+.score { font-family: var(--mono); font-weight: 500; font-size: 3.4rem; line-height: 1; direction: ltr; text-align: right; font-variant-numeric: tabular-nums; }
+.score small { font-size: 1.1rem; color: var(--panel-muted); }
+.base-line { font-size: 0.88rem; color: var(--panel-muted); margin: -8px 0 0; font-variant-numeric: tabular-nums; }
+.base-line .m { font-family: var(--mono); color: var(--panel-ink); direction: ltr; unicode-bidi: isolate; }
+.badge { justify-self: start; padding: 5px 14px; border-radius: 999px; font-weight: 700; color: #fff; font-size: 0.98rem; }
+.badge .range { font-family: var(--mono); font-weight: 400; font-size: 0.82rem; opacity: 0.9; margin-inline-start: 6px; direction: ltr; unicode-bidi: isolate; }
+.cat-desc { margin: 0; color: var(--panel-ink); font-size: 0.96rem; }
+
+.gauge { display: grid; gap: 6px; }
+.gauge-track { position: relative; display: flex; height: 10px; border-radius: 5px; }
+.gauge-track span { height: 100%; }
+.gauge-track span:first-child { border-start-start-radius: 5px; border-end-start-radius: 5px; }
+.gauge-track span:last-of-type { border-start-end-radius: 5px; border-end-end-radius: 5px; }
+.marker {
+  position: absolute; top: -5px; width: 4px; height: 20px; border-radius: 2px;
+  background: var(--panel-ink); box-shadow: 0 0 0 2px var(--panel);
+  transform: translateX(50%); transition: inset-inline-start 0.25s ease;
+}
+.gauge-ticks { position: relative; height: 16px; font-family: var(--mono); font-size: 0.72rem; color: var(--panel-muted); }
+.gauge-ticks span { position: absolute; transform: translateX(50%); direction: ltr; }
+
+.veto { background: var(--high); color: #fff; border-radius: 8px; padding: 10px 14px; font-weight: 700; font-size: 0.95rem; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.p-btn {
+  font: inherit; font-weight: 700; cursor: pointer; border-radius: 8px; padding: 9px 16px;
+  border: 1px solid var(--panel-ink); background: var(--panel-ink); color: var(--panel); text-decoration: none;
+}
+.p-btn.ghost { background: transparent; color: var(--panel-ink); border-color: rgba(255,255,255,0.35); }
+.p-btn:hover { filter: brightness(1.08); }
+.p-btn.ghost:hover { background: rgba(255,255,255,0.08); }
+.p-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.status { font-size: 0.88rem; color: var(--panel-muted); min-height: 1.4em; margin: 0; }
+.status.err { color: #ffb4ad; }
+.status a { color: var(--panel-ink); font-weight: 700; margin-inline-start: 6px; }
+.copy-fallback { display: grid; gap: 6px; }
+.copy-fallback .hint { color: var(--panel-muted); }
+.copy-fallback textarea { min-height: 120px; font-size: 0.85rem; }
+
+.formula { border-top: 1px solid rgba(255,255,255,0.14); padding-top: 14px; display: grid; gap: 6px; }
+.formula code {
+  display: block; direction: ltr; text-align: left; font-family: var(--mono); font-size: 0.82rem;
+  color: var(--panel-ink); background: rgba(255,255,255,0.06); border-radius: 6px; padding: 8px 10px;
+  overflow-x: auto; white-space: nowrap;
+}
+.formula .sub { color: var(--panel-muted); }
+
+.legend { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; font-size: 0.85rem; color: var(--panel-muted); }
+.legend li { display: flex; gap: 8px; align-items: center; }
+.legend i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.legend b { color: var(--panel-ink); font-weight: 600; }
+.legend .r { font-family: var(--mono); font-size: 0.78rem; direction: ltr; unicode-bidi: isolate; margin-inline-start: auto; }
+
+/* Library */
+.library { display: grid; gap: 18px; }
+.lib-head { display: flex; flex-wrap: wrap; align-items: end; justify-content: space-between; gap: 12px; }
+.lib-head h2 { font-family: var(--display); font-weight: 900; font-size: 2rem; margin: 0; line-height: 1.1; }
+.lib-head p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.lib-tools { display: flex; flex-wrap: wrap; gap: 10px; }
+.lib-tools input { width: 240px; max-width: 100%; }
+.lib-tools select { width: auto; }
+.lib-msg { color: var(--muted); border: 1px dashed var(--line); border-radius: 8px; padding: 20px; margin: 0; text-align: center; }
+
+.shelf { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.book {
+  display: grid; gap: 10px; align-content: start; min-width: 0; height: 100%;
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  border-inline-start: 6px solid var(--cat, var(--line));
+  padding: 16px 18px; color: inherit; text-decoration: none;
+}
+a.book:hover { border-color: var(--accent); border-inline-start-color: var(--cat, var(--line)); }
+.book-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.book h3 { font-family: var(--display); font-weight: 700; font-size: 1.15rem; margin: 0; line-height: 1.3; overflow-wrap: anywhere; }
+.bscore { display: grid; justify-items: end; flex: none; }
+.bscore .v { font-family: var(--mono); font-size: 1.3rem; direction: ltr; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.bscore .b { font-size: 0.74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font-size: 0.8rem; font-weight: 700; border-radius: 999px; padding: 2px 10px; color: #fff; }
+.chip.warn { background: var(--high); }
+.chip.plain { background: var(--sunk); color: var(--muted); }
+.book-meta { font-size: 0.84rem; color: var(--muted); }
+
+/* Book page */
+.bookview { display: grid; gap: 22px; }
+.back { justify-self: start; }
+.bv-grid { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 28px; align-items: start; }
+.bv-title { font-family: var(--display); font-weight: 900; font-size: clamp(1.8rem, 4vw, 2.4rem); line-height: 1.15; margin: 0; overflow-wrap: anywhere; text-wrap: balance; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.stats div { background: rgba(255,255,255,0.06); border-radius: 8px; padding: 8px 10px; }
+.stats dt { font-size: 0.76rem; color: var(--panel-muted); }
+.stats dd { margin: 0; font-family: var(--mono); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.trust-note { font-size: 0.85rem; color: var(--panel-muted); margin: 0; }
+.ratings { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.rating {
+  background: var(--card); border: 1px solid var(--line); border-radius: var(--radius);
+  border-inline-start: 6px solid var(--cat, var(--line));
+  padding: 14px 18px; display: grid; gap: 8px; min-width: 0;
+}
+.rating-top { display: flex; justify-content: space-between; align-items: start; gap: 12px; }
+.rater { font-weight: 700; }
+.rater .tr { font-family: var(--mono); font-size: 0.78rem; font-weight: 500; color: var(--accent); background: var(--accent-soft); border-radius: 999px; padding: 0 8px; margin-inline-start: 6px; }
+.params { font-size: 0.84rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rating-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
+.like {
+  font: inherit; font-size: 0.88rem; font-weight: 700; cursor: pointer; border-radius: 999px; padding: 3px 12px;
+  border: 1px solid var(--line); background: var(--card); color: var(--muted);
+}
+.like[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.like:disabled { cursor: not-allowed; opacity: 0.6; }
+.like .c { font-family: var(--mono); font-weight: 500; margin-inline-start: 4px; }
+.confirm { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; font-size: 0.88rem; color: var(--danger-ink); font-weight: 600; }
+
+/* Phone bottom bar */
+.mbar { display: none; }
+
+@media (max-width: 900px) {
+  .layout, .bv-grid { grid-template-columns: minmax(0, 1fr); }
+  .result { position: static; }
+  .mbar:not([hidden]) {
+    position: fixed; inset: auto 0 0 0; z-index: 20;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    background: var(--panel); color: var(--panel-ink);
+    padding-top: 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    border: none; font: inherit; cursor: pointer; text-align: start; width: 100%;
+    transition: transform 0.2s ease;
+  }
+  .mbar.away { transform: translateY(110%); }
+  .mbar .ms { font-family: var(--mono); font-size: 1.4rem; direction: ltr; }
+  .mbar .mb { padding: 3px 10px; border-radius: 999px; font-weight: 700; color: #fff; font-size: 0.9rem; }
+  .page { padding-bottom: 96px; }
+}
+@media (max-width: 620px) {
+  .grid-2, .grid-3 { grid-template-columns: minmax(0, 1fr); }
+  .section, .onboard { padding: 18px; }
+  .lib-tools, .lib-tools input, .lib-tools select { width: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marker, .mbar { transition: none; }
+}
+</style>
+<style>
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+[hidden] { display: none !important; }
+img { max-width: 100%; }
+.who-wrap { display: grid; gap: 8px; justify-items: end; }
+.notice { background: var(--accent-soft); color: var(--accent); border-radius: 8px; padding: 10px 14px; margin: 0; font-weight: 600; }
+.admin-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; background: var(--sunk); border-radius: 8px; padding: 10px 14px; font-weight: 600; }
+@media (max-width: 900px) { .who-wrap { justify-items: start; } }
+</style>
+</head>
+<body>
+<div class="page" dir="rtl" lang="he">
+  <header class="top">
+    <div class="top-text">
+      <span class="eyebrow">מחשבון דירוג לספרים</span>
+      <h1>מדד ה-<span class="latin">S-Book</span></h1>
+      <p class="lede">מחשבון אובייקטיבי לדירוג רמת המיניות בספרים, כדי שתדעו בדיוק למה לצפות לפני שאתם מתחילים לקרוא.</p>
+    </div>
+    <div class="who-wrap">
+    <div class="who" id="whoBar" hidden>
+      <span class="admin-chip" id="adminChip" hidden>מנהל</span>
+      <span>שלום, <b id="whoName"></b></span>
+      <span class="ichip" id="whoI"></span>
+      <button type="button" class="link" id="editProfile">שינוי פרופיל</button>
+    </div>
+    <div class="who" id="authBox" hidden>
+      <span id="authState"></span>
+      <button type="button" class="btn" id="signInBtn">התחברות עם Google</button>
+      <button type="button" class="link" id="signOutBtn" hidden>התנתקות</button>
+    </div>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="ניווט ראשי" hidden>
+    <a class="tab" href="#calc" id="tabCalc">מחשבון</a>
+    <a class="tab" href="#library" id="tabLib">ספרייה<span class="n" id="libCount">0</span></a>
+  </nav>
+
+  <p class="notice" id="offlineNote" hidden>האתר עוד לא מחובר למסד נתונים, ולכן הספרייה כבויה. המחשבון עובד כרגיל.</p>
+  <p class="boot" id="boot">טוען…</p>
+
+  <!-- Sign-up questionnaire -->
+  <form class="onboard" id="onboard" hidden novalidate>
+    <div>
+      <h2 id="obTitle">הרשמה לאתר</h2>
+      <p class="intro" id="obIntro">לפני שמתחילים, ענו על חמש שאלות קצרות על הרגלי הקריאה שלכם. אין כאן תשובות נכונות או לא נכונות, ענו לפי מה שבאמת קורה לכם.</p>
+    </div>
+
+    <div class="field">
+      <label for="nickname">איך לקרוא לכם?</label>
+      <span class="hint">השם הזה יופיע ליד כל ספר שתדרגו בספרייה</span>
+      <input type="text" id="nickname" maxlength="40" autocomplete="nickname" placeholder="לדוגמה: נועם">
+    </div>
+
+    <div id="questions" style="display:grid; gap:22px"></div>
+
+    <div class="verdict" id="verdict" hidden aria-live="polite">
+      <span class="hint">הפרופיל שלכם</span>
+      <b><span id="vName"></span> <span class="vi" id="vI"></span></b>
+      <p id="vDesc"></p>
+    </div>
+
+    <p class="ob-err" id="obErr" hidden></p>
+    <div class="ob-actions">
+      <button type="submit" class="btn-solid" id="obSubmit">המשך למחשבון</button>
+      <button type="button" class="link" id="obCancel" hidden>ביטול</button>
+    </div>
+    <p class="ob-note">התשובות לשאלות שמורות רק אצלכם ואחרים לא רואים אותן. רק השם שבחרתם מוצג לאחרים.</p>
+    <p class="ob-note" id="obGuest" hidden>אפשר להירשם גם בלי חשבון, והפרופיל יישמר בדפדפן הזה. כדי לשמור דירוגים ולהסכים עם דירוגים של אחרים צריך להתחבר עם Google (בראש הדף).</p>
+    <p class="ob-note latin" id="obUid" hidden style="direction:ltr; text-align:right; font-family: var(--mono)"></p>
+  </form>
+
+  <!-- ===== Calculator tab ===== -->
+  <div id="viewCalc" hidden>
+    <div class="layout">
+      <div class="form-col">
+
+        <div class="editing" id="editingBar" hidden>
+          <span id="editingText"></span>
+          <button type="button" class="link" id="stopEditing">ביטול עריכה</button>
+        </div>
+
+        <section class="section" aria-labelledby="h-book">
+          <div class="section-head"><span class="step">1</span><h2 id="h-book">נתוני המעטפת של הספר</h2></div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="bookTitle">שם הספר</label>
+              <span class="hint">חובה לשמירה בספרייה</span>
+              <input type="text" id="bookTitle" maxlength="120" placeholder="לדוגמה: הארי פוטר ואבן החכמים" autocomplete="off" list="knownTitles">
+              <datalist id="knownTitles"></datalist>
+            </div>
+            <div class="field">
+              <label for="totalPages">מספר עמודים כולל בספר</label>
+              <span class="hint">&nbsp;</span>
+              <input type="number" id="totalPages" value="300" min="1" step="1" inputmode="numeric">
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="pov">נקודת מבט<span class="sym">W</span></label>
+              <span class="hint">גוף ראשון מעצים את החוויה עבור הקורא</span>
+              <select id="pov">
+                <option value="5">גוף שלישי ("הוא/היא"), מרוחק יותר (W=5)</option>
+                <option value="3">גוף ראשון ("אני"), אינטנסיבי יותר (W=3)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="percentage">נפח הסצנות בעלילה<span class="sym">P</span></label>
+              <span class="hint">כמה אחוזים מהספר תופסות סצנות כאלו?</span>
+              <select id="percentage">
+                <option value="0">0% (אין כלל)</option>
+                <option value="0.02">כמעט כלום / רמיזה בודדת (2%)</option>
+                <option value="0.05">חלק קטן מאוד (5%)</option>
+                <option value="0.10" selected>חלק קטן (10%)</option>
+                <option value="0.20">חלק משמעותי (20%)</option>
+                <option value="0.45">מרכז העלילה (45%+)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="unexpected">רמת ההפתעה<span class="sym">U</span></label>
+              <span class="hint">האם הז'אנר או העלילה הכינו את הקורא מראש?</span>
+              <select id="unexpected">
+                <option value="1.0">צפוי / העלילה רומזת מראש (U=1.0)</option>
+                <option value="1.5">מפתיע / נוחת משום מקום (U=1.5)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="apathy">אדישות הספר והריחוק התיאורי<span class="sym">A</span></label>
+              <span class="hint">איך הסופר מתאר את הסיטואציות?</span>
+              <select id="apathy">
+                <option value="5">עמעום מסך / דיווח יבש ומרוחק (A=5)</option>
+                <option value="4">מרומז מאוד ועדין (A=4)</option>
+                <option value="3" selected>תיאור ישיר אך לא אנטומי (A=3)</option>
+                <option value="2">תיאור מפורט ודרמטי (A=2)</option>
+                <option value="1">תיאור גרפי ובוטה מאוד (A=1)</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="h-main">
+          <div class="section-head"><span class="step">2</span><h2 id="h-main">הדמות הראשית <span class="sym">κ</span></h2></div>
+          <div class="grid-2">
+            <div class="field">
+              <label for="mainEvents">כמות אירועים/סצנות של הדמות</label>
+              <span class="hint">התדירות (F) מחושבת אוטומטית לפי 100 עמודים</span>
+              <input type="number" id="mainEvents" value="2" min="0" step="1" inputmode="numeric">
+            </div>
+            <div class="field">
+              <label for="mainExplicit">עוצמה ובוטות<span class="sym">E</span></label>
+              <span class="hint">רמה 3 מפעילה תגית אזהרה</span>
+              <select id="mainExplicit">
+                <option value="0">0: אין מעורבות</option>
+                <option value="1">1: מתח רומנטי, נשיקות או רמיזות</option>
+                <option value="2" selected>2: מגע אינטימי ברור ללא פירוט</option>
+                <option value="3">3: תיאור מיני מפורט וגרפי (!)</option>
+              </select>
+            </div>
+          </div>
+          <div class="field">
+            <label for="mainInitiative">יוזמה ומיקוד<span class="sym">C</span></label>
+            <select id="mainInitiative">
+              <option value="0">0: אין מעורבות</option>
+              <option value="1">1: נגררת לסיטואציה / אגבית</option>
+              <option value="2" selected>2: משתפת פעולה כחלק מקשר רגשי</option>
+              <option value="3">3: מונעת מתשוקה ויוזמת באופן אקטיבי</option>
+            </select>
+          </div>
+          <div class="derived" id="mainCharSummary" aria-live="polite"></div>
+        </section>
+
+        <section class="section" aria-labelledby="h-sec">
+          <div class="section-head"><span class="step">3</span><h2 id="h-sec">דמויות משנה <span class="sym">δ</span></h2></div>
+          <p class="section-note">הוסיפו רק דמויות משנה שיש להן מעורבות מינית בעלילה. המחשבון מחשב את הממוצע שלהן.</p>
+          <div class="chars" id="secondaryChars"></div>
+          <p class="empty-note" id="secEmpty">אין דמויות משנה. אם אין כאלה בספר, אפשר להשאיר את החלק הזה ריק.</p>
+          <button type="button" class="btn" id="addSec">+ הוסף דמות משנה</button>
+        </section>
+      </div>
+
+      <aside class="panel result" id="resultBox">
+        <div aria-live="polite">
+          <div class="result-label">הציון שלכם</div>
+          <p class="result-title" id="resultTitle">ספר ללא שם</p>
+        </div>
+        <div class="score" id="finalScore">0.0</div>
+        <p class="base-line">ציון הספר <span class="m" id="baseScore">0.0</span> × מקדם התמימות שלכם <span class="m" id="baseI">I=1.0</span></p>
+        <span class="badge" id="categoryBadge"></span>
+        <p class="cat-desc" id="categoryDesc"></p>
+
+        <div class="gauge" aria-hidden="true">
+          <div class="gauge-track" id="gaugeTrack"></div>
+          <div class="gauge-ticks" id="gaugeTicks"></div>
+        </div>
+
+        <div class="veto" id="veto" hidden></div>
+
+        <div class="actions">
+          <button type="button" class="p-btn" id="saveBtn">שמור לספרייה</button>
+          <button type="button" class="p-btn ghost" id="copyBtn">העתק תוצאה לשיתוף</button>
+        </div>
+        <p class="status" id="status" role="status"></p>
+        <div class="copy-fallback" id="copyFallback" hidden>
+          <span class="hint">ההעתקה האוטומטית לא זמינה כאן. הטקסט מסומן, אפשר להעתיק אותו ידנית (Ctrl+C):</span>
+          <textarea id="copyText" readonly></textarea>
+        </div>
+
+        <div class="formula">
+          <div class="result-label">הנוסחה</div>
+          <code>S_raw = [P × U × (Πκ/W + Π̄δ/5)] / A</code>
+          <code class="sub" id="formulaLive"></code>
+          <code>S_book = 10 × ln(1 + 30·S_raw) / ln(1 + 30·3.24)</code>
+          <code class="sub" id="formulaScale"></code>
+          <code>S_you = S_book × I</code>
+          <code class="sub" id="formulaYou"></code>
+          <p class="base-line" style="margin:0">הנוסחה הבסיסית נותנת מספרים זעירים שקשה להבחין ביניהם, ולכן הציון נמתח לסולם 0–10 בעזרת לוגריתם. 10 הוא הספר הבוטה ביותר שהמחשבון יכול לתאר.</p>
+        </div>
+
+        <ul class="legend" id="legend"></ul>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ===== Library tab ===== -->
+  <section class="library" id="viewLib" hidden aria-labelledby="h-lib">
+    <div class="lib-head">
+      <div>
+        <h2 id="h-lib">הספרייה</h2>
+        <p>כל הספרים שדורגו. הציון הגדול הוא ממוצע הדירוגים, מותאם לפרופיל הקורא שלכם. לחצו על ספר כדי לראות את כל הדירוגים שלו.</p>
+      </div>
+      <div class="lib-tools">
+        <input type="search" id="libSearch" placeholder="חיפוש לפי שם ספר" aria-label="חיפוש לפי שם ספר">
+        <select id="libSort" aria-label="מיון">
+          <option value="new">דורגו לאחרונה</option>
+          <option value="count">הכי הרבה דירוגים</option>
+          <option value="high">ציון: מהגבוה לנמוך</option>
+          <option value="low">ציון: מהנמוך לגבוה</option>
+          <option value="abc">לפי שם (א–ת)</option>
+        </select>
+      </div>
+    </div>
+    <div class="admin-tools" id="adminTools" hidden>
+      <span>כלי מנהל: הספרייה ריקה מדירוגי פתיחה.</span>
+      <button type="button" class="btn" id="seedBtn">טען 11 דירוגי פתיחה</button>
+    </div>
+    <p class="lib-msg" id="libMsg">טוען את הספרייה…</p>
+    <ul class="shelf" id="shelf"></ul>
+  </section>
+
+  <!-- ===== Book page ===== -->
+  <section class="bookview" id="viewBook" hidden>
+    <a class="link back" href="#library">→ חזרה לספרייה</a>
+    <p class="lib-msg" id="bookMsg" hidden></p>
+    <div class="bv-grid" id="bookBody">
+      <aside class="panel" id="bookPanel">
+        <div>
+          <div class="result-label">ממוצע הדירוגים, מותאם אליכם</div>
+          <h2 class="bv-title" id="bvTitle" style="color: var(--panel-ink)"></h2>
+        </div>
+        <div class="score" id="bvScore">0.0</div>
+        <p class="base-line">ציון הספר הממוצע <span class="m" id="bvBase">0.0</span> × <span class="m" id="bvI">I=1.0</span></p>
+        <span class="badge" id="bvBadge"></span>
+        <p class="cat-desc" id="bvDesc"></p>
+        <div class="veto" id="bvVeto" hidden></div>
+        <dl class="stats">
+          <div><dt>מספר דירוגים</dt><dd id="bvCount">0</dd></div>
+          <div><dt>ממוצע פשוט</dt><dd id="bvSimple">0.0</dd></div>
+          <div><dt>ממוצע משוקלל לפי אמון</dt><dd id="bvWeighted">0.0</dd></div>
+          <div><dt>טווח הדירוגים</dt><dd id="bvRange">–</dd></div>
+        </dl>
+        <p class="trust-note">הממוצע משוקלל לפי רמת האמון של כל מדרג. רמת האמון נקבעת לפי כמה אנשים הסכימו עם הדירוגים שלו. כל עוד אין הסכמות, כל הדירוגים שווים.</p>
+        <div class="actions"><button type="button" class="p-btn" id="rateThis">דרגו את הספר הזה</button></div>
+      </aside>
+      <div style="display:grid; gap:12px; min-width:0">
+        <h3 style="font-family: var(--display); font-size: 1.3rem; margin: 0">כל הדירוגים</h3>
+        <p class="hint" style="margin:0">מסכימים עם דירוג? לחצו "מסכים". ההסכמה מעלה את רמת האמון של המדרג.</p>
+        <ul class="ratings" id="ratingsList"></ul>
+      </div>
+    </div>
+  </section>
+</div>
+
+<button type="button" class="mbar" id="mbar" aria-label="מעבר לתוצאה" hidden>
+  <span>הציון שלכם: <span class="ms" id="mScore">0.0</span></span>
+  <span class="mb" id="mBadge"></span>
+</button>
+
+
+<script type="module">
+import { firebaseConfig } from './firebase-config.js';
+
+const FB = 'https://www.gstatic.com/firebasejs/10.12.2/';
+const $ = (id) => document.getElementById(id);
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// ---------- Categories & scale ----------
+const CATS = [
+  { max: 1, name: 'נקי לחלוטין', range: '0–1', color: 'var(--safe)',
+    desc: 'ספר בטוח לקריאה ללא תוכן מיני מטריד. לכל היותר חיבוקים, נשיקות תמימות או רמיזות קלות.' },
+  { max: 2.5, name: 'רמיזות קלות', range: '1–2.5', color: 'var(--mild)',
+    desc: 'הספר מכיל מתח רומנטי או רמיזות עדינות שעשויות להביך קוראים שמרנים מאוד, ללא תיאורים מפורשים.' },
+  { max: 4.5, name: 'תוכן בינוני', range: '2.5–4.5', color: 'var(--mod)',
+    desc: 'קיימות בספר סצנות אינטימיות ברורות כחלק מהעלילה, אך הן אינן משתלטות על הספר.' },
+  { max: Infinity, name: 'תוכן מובהק', range: '4.5–10', color: 'var(--high)',
+    desc: 'ספר עמוס בתוכן מיני בולט. מומלץ לקוראים שמחפשים ז׳אנר רומנטי-אירוטי בלבד.' }
+];
+const GAUGE_MAX = 10;
+const RAW_MAX = 0.45 * 1.5 * (9 / 3 + 9 / 5) / 1;   // = 3.24
+const K = 30;
+const toScale = (raw) => raw <= 0 ? 0 : 10 * Math.log(1 + K * raw) / Math.log(1 + K * RAW_MAX);
+const fmt = (x) => x.toFixed(1);
+const catFor = (score) => CATS.find((c) => score <= c.max);
+
+// ---------- Reader profile (I) ----------
+const QUESTIONS = [
+  { id: 'age', text: 'מה הגיל שלכם?',
+    opts: [{ t: 'עד 12', p: 0 }, { t: '13 עד 15', p: 1 }, { t: '16 עד 17', p: 2 }, { t: '18 ומעלה', p: 3 }] },
+  { id: 'shelf', text: 'איזה מדף בחנות הספרים הכי מוכר לכם?',
+    opts: [{ t: 'ספרי ילדים והרפתקאות', p: 0 }, { t: 'נוער ופנטזיה', p: 1 }, { t: 'רומנים ופרוזה למבוגרים', p: 2 }, { t: 'אני קורא/ת מכל מדף', p: 2 }] },
+  { id: 'joke', text: 'אתם צופים בסרט עם מבוגרים, וכולם צוחקים מבדיחה שלא ממש הבנתם. כמה זה קורה לכם?',
+    opts: [{ t: 'לא מעט', p: 0 }, { t: 'מדי פעם', p: 1 }, { t: 'כמעט אף פעם', p: 2 }] },
+  { id: 'cup', text: 'בספר כתוב: "היא הושיטה לו את הספל, והאצבעות שלהם נגעו רגע אחד יותר מהנדרש." מה לדעתכם המשפט הזה עושה בסיפור?',
+    opts: [{ t: 'מתאר פרט קטן מהבוקר שלהם', p: 0 }, { t: 'רומז שמתחיל להיווצר ביניהם משהו', p: 2 }, { t: 'קשה לדעת בלי לקרוא עוד', p: 1 }] },
+  { id: 'skip', text: 'סצנה בספר נקטעת באמצע, והפרק הבא מתחיל למחרת בבוקר. מה אתם עושים בדרך כלל?',
+    opts: [{ t: 'ממשיכים הלאה, כנראה שזה לא חשוב', p: 0 }, { t: 'משלימים לבד בראש את מה שדולג', p: 2 }, { t: 'חוזרים לבדוק אם פספסתי משהו', p: 1 }] }
+];
+const PROFILES = [
+  { minPts: 8, I: 1.0, name: 'קורא בוגר ומנוסה', desc: 'אתם מבינים כל רמז וסאבטקסט, ולכן הציונים מוצגים לכם במלואם.' },
+  { minPts: 4, I: 0.8, name: 'קורא ממוצע', desc: 'חלק מהרמיזות עוברות לידכם, ולכן הציונים שלכם נמוכים מעט מציון הספר.' },
+  { minPts: 0, I: 0.3, name: 'קורא צעיר / תמים', desc: 'רוב הרמיזות לא נקלטות אצלכם, ולכן הציונים שלכם נמוכים משמעותית מציון הספר.' }
+];
+const profileFor = (pts) => PROFILES.find((p) => pts >= p.minPts);
+const profileByI = (I) => PROFILES.find((p) => p.I === I) || PROFILES[0];
+
+// Starter ratings (admin can load them once)
+const STARTER = [
+  ['starter-hp1', 'הארי פוטר ואבן החכמים', { pages: 320, pov: 5, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
+  ['starter-hp6', 'הארי פוטר והנסיך חצוי הדם', { pages: 650, pov: 5, percentage: 0.02, unexpected: 1, apathy: 4, mainEvents: 3, mainExplicit: 1, mainInitiative: 2, secondary: [{ ev: 4, ex: 1, ini: 1 }] }],
+  ['starter-hunger', 'משחקי הרעב', { pages: 380, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 5, mainExplicit: 1, mainInitiative: 1, secondary: [] }],
+  ['starter-twilight', 'דמדומים', { pages: 500, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 4, mainExplicit: 1, mainInitiative: 3, secondary: [] }],
+  ['starter-pride', 'גאווה ודעה קדומה', { pages: 430, pov: 5, percentage: 0.02, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [{ ev: 1, ex: 1, ini: 3 }] }],
+  ['starter-prince', 'הנסיך הקטן', { pages: 96, pov: 3, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
+  ['starter-1984', '1984', { pages: 330, pov: 5, percentage: 0.1, unexpected: 1, apathy: 3, mainEvents: 4, mainExplicit: 2, mainInitiative: 2, secondary: [{ ev: 4, ex: 2, ini: 3 }] }],
+  ['starter-annefrank', 'יומנה של אנה פרנק', { pages: 340, pov: 3, percentage: 0.02, unexpected: 1, apathy: 4, mainEvents: 3, mainExplicit: 1, mainInitiative: 2, secondary: [] }],
+  ['starter-lotr1', 'שר הטבעות: אחוות הטבעת', { pages: 480, pov: 5, percentage: 0, unexpected: 1, apathy: 5, mainEvents: 0, mainExplicit: 0, mainInitiative: 0, secondary: [] }],
+  ['starter-catcher', 'התפסן בשדה השיפון', { pages: 230, pov: 3, percentage: 0.05, unexpected: 1, apathy: 4, mainEvents: 2, mainExplicit: 1, mainInitiative: 1, secondary: [] }],
+  ['starter-50shades', 'חמישים גוונים של אפור', { pages: 520, pov: 3, percentage: 0.45, unexpected: 1, apathy: 1, mainEvents: 15, mainExplicit: 3, mainInitiative: 2, secondary: [] }]
+];
+const STARTER_UID = 'sbook-starter';
+
+let me = { nickname: '', I: 1.0, answers: null };
+let appReady = false;
+
+// ---------- Onboarding ----------
+(function buildQuestions() {
+  const wrap = $('questions');
+  QUESTIONS.forEach((q, qi) => {
+    const fs = document.createElement('fieldset');
+    fs.className = 'q';
+    const lg = document.createElement('legend');
+    const qn = document.createElement('span'); qn.className = 'qn'; qn.textContent = (qi + 1) + '.';
+    lg.append(qn, q.text);
+    fs.appendChild(lg);
+    const opts = document.createElement('div'); opts.className = 'opts';
+    q.opts.forEach((opt, oi) => {
+      const l = document.createElement('label'); l.className = 'opt';
+      const inp = document.createElement('input');
+      inp.type = 'radio'; inp.name = 'q_' + q.id; inp.value = String(oi); inp.id = `q_${q.id}_${oi}`;
+      const sp = document.createElement('span'); sp.textContent = opt.t;
+      l.append(inp, sp);
+      opts.appendChild(l);
+    });
+    fs.appendChild(opts);
+    wrap.appendChild(fs);
+  });
+})();
+
+function readAnswers() {
+  const ans = {};
+  let complete = true, pts = 0;
+  QUESTIONS.forEach((q) => {
+    const c = document.querySelector(`input[name="q_${q.id}"]:checked`);
+    if (c) { const i = Number(c.value); ans[q.id] = i; pts += (q.opts[i] ? q.opts[i].p : 0); } else complete = false;
+  });
+  return { ans, complete, pts };
+}
+
+function updateVerdict() {
+  const { complete, pts } = readAnswers();
+  $('verdict').hidden = !complete;
+  if (complete) {
+    const p = profileFor(pts);
+    $('vName').textContent = p.name;
+    $('vI').textContent = `(I=${p.I.toFixed(1)})`;
+    $('vDesc').textContent = p.desc;
+  }
+}
+$('onboard').addEventListener('change', updateVerdict);
+
+function hideViews() {
+  ['viewCalc', 'viewLib', 'viewBook'].forEach((v) => { $(v).hidden = true; });
+  $('mbar').hidden = true;
+}
+
+function showOnboarding(isEdit) {
+  appReady = false;
+  $('boot').hidden = true;
+  hideViews(); $('tabs').hidden = true; $('whoBar').hidden = true;
+  $('onboard').hidden = false;
+  $('obErr').hidden = true;
+  $('obGuest').hidden = !!uid || !fs;
+  $('obUid').hidden = !(isEdit && uid);
+  if (uid) $('obUid').textContent = `מזהה המשתמש שלכם (למנהל האתר): ${uid}`;
+  $('obTitle').textContent = isEdit ? 'עדכון פרופיל הקורא' : 'הרשמה לאתר';
+  $('obIntro').textContent = isEdit
+    ? 'אפשר לשנות את השם או לענות מחדש על השאלות. הפרופיל החדש ישפיע על כל הציונים שמוצגים לכם.'
+    : 'לפני שמתחילים, ענו על חמש שאלות קצרות על הרגלי הקריאה שלכם. אין כאן תשובות נכונות או לא נכונות, ענו לפי מה שבאמת קורה לכם. לפי התשובות נקבע את פרופיל הקורא שלכם (מקדם התמימות I), וכל ציון של ספר יותאם אליכם אוטומטית.';
+  $('obSubmit').textContent = isEdit ? 'שמור פרופיל' : 'המשך';
+  $('obCancel').hidden = !isEdit;
+  $('nickname').value = me.nickname || '';
+  if (me.answers) {
+    QUESTIONS.forEach((q) => {
+      const el = document.getElementById(`q_${q.id}_${me.answers[q.id]}`);
+      if (el) el.checked = true;
+    });
+  }
+  updateVerdict();
+  window.scrollTo(0, 0);
+}
+
+function enterApp() {
+  appReady = true;
+  $('boot').hidden = true;
+  $('onboard').hidden = true;
+  $('tabs').hidden = false; $('whoBar').hidden = false;
+  $('whoName').textContent = me.nickname || 'קורא/ת';
+  $('whoI').textContent = `${profileByI(me.I).name} · I=${me.I.toFixed(1)}`;
+  calculate();
+  renderAll();
+  route();
+}
+
+$('obCancel').addEventListener('click', enterApp);
+$('editProfile').addEventListener('click', () => showOnboarding(true));
+
+let savingProfile = false;
+$('onboard').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (savingProfile) return;
+  const nickname = $('nickname').value.trim().slice(0, 40);
+  const { ans, complete, pts } = readAnswers();
+  const err = $('obErr');
+  if (!nickname) { err.textContent = 'כתבו שם שיופיע ליד הספרים שתדרגו.'; err.hidden = false; $('nickname').focus(); return; }
+  if (!complete) { err.textContent = 'ענו על כל השאלות כדי שנוכל לקבוע את הפרופיל שלכם.'; err.hidden = false; return; }
+  err.hidden = true;
+  const p = profileFor(pts);
+  me = { nickname, I: p.I, answers: ans };
+  saveLocal();
+  savingProfile = true; $('obSubmit').disabled = true;
+  let note = '';
+  try { if (uid) await saveProfileRemote(); }
+  catch (e2) { note = 'לא הצלחנו לשמור את הפרופיל בחשבון. הוא נשמר בינתיים בדפדפן הזה.'; }
+  finally { savingProfile = false; $('obSubmit').disabled = false; }
+  enterApp();
+  if (note) status(note, true);
+});
+
+const LS_KEY = 'sbook-profile';
+function saveLocal() { try { localStorage.setItem(LS_KEY, JSON.stringify(me)); } catch (e) {} }
+function loadLocal() {
+  try {
+    const v = JSON.parse(localStorage.getItem(LS_KEY) || 'null');
+    return v && typeof v === 'object' ? v : null;
+  } catch (e) { return null; }
+}
+function adoptProfile(raw) {
+  if (!raw) return false;
+  const I = Number(raw.I);
+  if (!PROFILES.some((p) => p.I === I)) return false;
+  me = { nickname: String(raw.nickname || '').slice(0, 40), I, answers: raw.answers && typeof raw.answers === 'object' ? raw.answers : null };
+  return true;
+}
+
+// ---------- Gauge + legend ----------
+(function buildScale() {
+  const track = $('gaugeTrack'), ticks = $('gaugeTicks'), legend = $('legend');
+  let prev = 0;
+  CATS.forEach((c) => {
+    const end = Math.min(c.max, GAUGE_MAX);
+    const seg = document.createElement('span');
+    seg.style.width = ((end - prev) / GAUGE_MAX * 100) + '%';
+    seg.style.background = c.color;
+    track.appendChild(seg);
+    const t = document.createElement('span');
+    t.textContent = String(prev);
+    t.style.insetInlineStart = (prev / GAUGE_MAX * 100) + '%';
+    if (prev === 0) t.style.transform = 'none';
+    ticks.appendChild(t);
+    const li = document.createElement('li');
+    li.innerHTML = '<i></i><b></b><span class="r"></span>';
+    li.querySelector('i').style.background = c.color;
+    li.querySelector('b').textContent = c.name;
+    li.querySelector('.r').textContent = c.range;
+    legend.appendChild(li);
+    prev = end;
+  });
+  const m = document.createElement('div');
+  m.className = 'marker'; m.id = 'marker';
+  track.appendChild(m);
+})();
+
+// ---------- Pure scoring ----------
+const ALLOWED = {
+  pov: [5, 3], percentage: [0, 0.02, 0.05, 0.10, 0.20, 0.45], unexpected: [1, 1.5], apathy: [5, 4, 3, 2, 1]
+};
+const pick = (v, list, dflt) => { const n = Number(v); return list.includes(n) ? n : dflt; };
+const intIn = (v, lo, hi, dflt) => { const n = parseInt(v, 10); return Number.isFinite(n) && n >= lo && n <= hi ? n : dflt; };
+const nonNeg = (v) => { const n = parseInt(v, 10); return Number.isFinite(n) && n > 0 ? Math.min(n, 100000) : 0; };
+
+function clean(raw) {
+  raw = raw || {};
+  const sec = Array.isArray(raw.secondary) ? raw.secondary.slice(0, 50) : [];
+  return {
+    title: String(raw.title || '').trim().slice(0, 120),
+    pages: Math.max(1, nonNeg(raw.pages) || 300),
+    pov: pick(raw.pov, ALLOWED.pov, 5),
+    percentage: pick(raw.percentage, ALLOWED.percentage, 0.10),
+    unexpected: pick(raw.unexpected, ALLOWED.unexpected, 1),
+    apathy: pick(raw.apathy, ALLOWED.apathy, 3),
+    mainEvents: nonNeg(raw.mainEvents),
+    mainExplicit: intIn(raw.mainExplicit, 0, 3, 0),
+    mainInitiative: intIn(raw.mainInitiative, 0, 3, 0),
+    secondary: sec.map((s) => ({
+      ev: nonNeg(s && s.ev), ex: intIn(s && s.ex, 1, 3, 1), ini: intIn(s && s.ini, 1, 3, 1)
+    }))
+  };
+}
+
+function freqScore(events, pages) {
+  if (events <= 0) return 0;
+  const rate = events / pages * 100;
+  if (rate <= 1) return 1;
+  if (rate <= 3) return 2;
+  return 3;
+}
+
+function compute(inp) {
+  const { pages } = inp;
+  const mainF = freqScore(inp.mainEvents, pages);
+  const piMain = (inp.mainEvents === 0 || inp.mainExplicit === 0 || inp.mainInitiative === 0)
+    ? 0 : mainF + inp.mainExplicit + inp.mainInitiative;
+  const vetoWho = [];
+  if (piMain > 0 && inp.mainExplicit === 3) vetoWho.push('הדמות הראשית');
+  let sum = 0, active = 0;
+  const secs = inp.secondary.map((s, i) => {
+    const f = freqScore(s.ev, pages);
+    const pi = s.ev > 0 ? f + s.ex + s.ini : 0;
+    if (s.ev > 0) { sum += pi; active++; if (s.ex === 3) vetoWho.push('דמות משנה ' + (i + 1)); }
+    return { f, pi };
+  });
+  const piSec = active > 0 ? sum / active : 0;
+  const P = inp.percentage;
+  const raw = P === 0 ? 0 : (P * inp.unexpected * ((piMain / inp.pov) + (piSec / 5))) / inp.apathy;
+  const book = toScale(raw);
+  const you = book * me.I;
+  const veto = P > 0 && vetoWho.length > 0;
+  return { raw, book, you, cat: catFor(you), mainF, piMain, secs, piSec, veto, vetoWho };
+}
+
+const rateText = (events, pages) => (events / pages * 100).toFixed(2);
+
+// ---------- Form <-> inputs ----------
+function readForm() {
+  return clean({
+    title: $('bookTitle').value,
+    pages: $('totalPages').value,
+    pov: $('pov').value, percentage: $('percentage').value, unexpected: $('unexpected').value,
+    apathy: $('apathy').value,
+    mainEvents: $('mainEvents').value, mainExplicit: $('mainExplicit').value, mainInitiative: $('mainInitiative').value,
+    secondary: [...document.querySelectorAll('#secondaryChars .char-box')].map((b) => ({
+      ev: b.querySelector('.sec-events').value,
+      ex: b.querySelector('.sec-explicit').value,
+      ini: b.querySelector('.sec-initiative').value
+    }))
+  });
+}
+
+const setSelect = (id, v) => {
+  const el = $(id);
+  const opt = [...el.options].find((o) => Number(o.value) === Number(v));
+  if (opt) el.value = opt.value;
+};
+
+function fillForm(inp) {
+  $('bookTitle').value = inp.title;
+  $('totalPages').value = inp.pages;
+  setSelect('pov', inp.pov); setSelect('percentage', inp.percentage); setSelect('unexpected', inp.unexpected);
+  setSelect('apathy', inp.apathy);
+  $('mainEvents').value = inp.mainEvents;
+  setSelect('mainExplicit', inp.mainExplicit); setSelect('mainInitiative', inp.mainInitiative);
+  $('secondaryChars').innerHTML = '';
+  inp.secondary.forEach((s) => addSecondary(s, false));
+  calculate();
+}
+
+// ---------- Secondary characters ----------
+let secSeq = 0;
+function addSecondary(values, focus) {
+  secSeq++;
+  const n = secSeq;
+  const box = document.createElement('div');
+  box.className = 'char-box';
+  box.innerHTML = `
+    <div class="char-head">
+      <strong class="char-name">דמות משנה</strong>
+      <button type="button" class="btn-remove">הסר</button>
+    </div>
+    <div class="grid-3">
+      <div class="field">
+        <label for="secEv${n}">כמות אירועים</label>
+        <input type="number" id="secEv${n}" class="sec-events" value="1" min="0" step="1" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label for="secEx${n}">עוצמה ובוטות<span class="sym">E</span></label>
+        <select id="secEx${n}" class="sec-explicit">
+          <option value="1">1: מתח רומנטי / רמיזות</option>
+          <option value="2">2: מגע ברור ללא פירוט</option>
+          <option value="3">3: תיאור גרפי (!)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="secIn${n}">יוזמה ומיקוד<span class="sym">C</span></label>
+        <select id="secIn${n}" class="sec-initiative">
+          <option value="1">1: אגבית / נגררת</option>
+          <option value="2">2: חלק מקשר רגשי</option>
+          <option value="3">3: יוזמת באופן אקטיבי</option>
+        </select>
+      </div>
+    </div>
+    <div class="derived sec-summary"></div>`;
+  if (values) {
+    box.querySelector('.sec-events').value = values.ev;
+    box.querySelector('.sec-explicit').value = String(values.ex);
+    box.querySelector('.sec-initiative').value = String(values.ini);
+  }
+  box.querySelector('.btn-remove').addEventListener('click', () => { box.remove(); calculate(); });
+  $('secondaryChars').appendChild(box);
+  if (focus !== false) { calculate(); box.querySelector('.sec-events').focus(); }
+}
+
+// ---------- Render calculator ----------
+let current = null;
+function calculate() {
+  const inp = readForm();
+  const r = compute(inp);
+  current = { inp, r };
+
+  $('mainCharSummary').textContent =
+    `Πκ = ${r.piMain} מתוך 9  ·  תדירות F=${r.mainF} (${rateText(inp.mainEvents, inp.pages)} סצנות ל-100 עמ'), עוצמה E=${inp.mainExplicit}, יוזמה C=${inp.mainInitiative}`;
+
+  const boxes = document.querySelectorAll('#secondaryChars .char-box');
+  boxes.forEach((box, i) => {
+    box.querySelector('.char-name').textContent = 'דמות משנה ' + (i + 1);
+    const s = inp.secondary[i], x = r.secs[i];
+    box.querySelector('.sec-summary').textContent = s.ev > 0
+      ? `Πδ = ${x.pi} מתוך 9  ·  F=${x.f} (${rateText(s.ev, inp.pages)} ל-100 עמ'), E=${s.ex}, C=${s.ini}`
+      : 'ללא אירועים: הדמות לא נכנסת לממוצע';
+  });
+  $('secEmpty').hidden = boxes.length > 0;
+
+  $('resultTitle').textContent = inp.title ? `"${inp.title}"` : 'ספר ללא שם';
+  $('finalScore').textContent = fmt(r.you);
+  $('baseScore').textContent = fmt(r.book);
+  $('baseI').textContent = `I=${me.I.toFixed(1)}`;
+  $('formulaLive').textContent =
+    `= [${inp.percentage.toFixed(2)} × ${inp.unexpected.toFixed(1)} × (${r.piMain}/${inp.pov} + ${r.piSec.toFixed(2)}/5)] / ${inp.apathy} = ${r.raw.toFixed(4)}`;
+  $('formulaScale').textContent = `= 10 × ln(1 + 30 × ${r.raw.toFixed(4)}) / ln(98.2) = ${r.book.toFixed(2)}`;
+  $('formulaYou').textContent = `= ${r.book.toFixed(2)} × ${me.I.toFixed(1)} = ${r.you.toFixed(2)}`;
+
+  paintBadge($('categoryBadge'), r.cat);
+  $('categoryDesc').textContent = r.cat.desc;
+  $('marker').style.insetInlineStart = (Math.min(r.you, GAUGE_MAX) / GAUGE_MAX * 100) + '%';
+
+  $('mScore').textContent = fmt(r.you);
+  $('mBadge').textContent = r.cat.name;
+  $('mBadge').style.background = r.cat.color;
+
+  const veto = $('veto');
+  veto.hidden = !r.veto;
+  if (r.veto) veto.textContent = `⚠ אזהרת תוכן מפורש: יש בספר לפחות סצנה אחת עם תיאור גרפי (E=3), אצל ${r.vetoWho.join(', ')}.`;
+}
+
+function paintBadge(el, cat) {
+  el.textContent = cat.name;
+  const rg = document.createElement('span'); rg.className = 'range'; rg.textContent = cat.range;
+  el.appendChild(rg);
+  el.style.background = cat.color;
+}
+
+// ---------- Status line ----------
+let statusTimer = null;
+function status(msg, isErr, action) {
+  const el = $('status');
+  el.textContent = msg;
+  if (action) {
+    const a = document.createElement(action.href ? 'a' : 'button');
+    if (action.href) a.href = action.href; else { a.type = 'button'; a.className = 'link'; a.style.color = 'var(--panel-ink)'; a.addEventListener('click', action.onClick); }
+    a.textContent = action.text;
+    el.appendChild(a);
+  }
+  el.classList.toggle('err', !!isErr);
+  clearTimeout(statusTimer);
+  if (msg && !isErr && !action) statusTimer = setTimeout(() => { el.textContent = ''; }, 5000);
+}
+
+// ---------- Copy result ----------
+function shareText() {
+  const { inp, r } = current;
+  const bookCat = catFor(r.book);
+  const lines = [];
+  lines.push(`📚 מדד ה-S-Book${inp.title ? `: "${inp.title}"` : ''}`);
+  lines.push(`ציון הספר: ${fmt(r.book)} מתוך 10 · ${bookCat.name} (${bookCat.range})`);
+  lines.push(bookCat.desc);
+  if (r.veto) lines.push('⚠️ אזהרת תוכן מפורש: יש בספר לפחות סצנה אחת עם תיאור גרפי.');
+  lines.push(`נקודת מבט: ${inp.pov === 3 ? 'גוף ראשון' : 'גוף שלישי'} · נפח סצנות: ${Math.round(inp.percentage * 100)}% · ${inp.pages} עמודים`);
+  if (me.nickname) lines.push(`דורג ע"י ${me.nickname}`);
+  lines.push(location.origin + location.pathname);
+  return lines.join('\n');
+}
+$('copyBtn').addEventListener('click', () => {
+  const text = shareText();
+  $('copyFallback').hidden = true;
+  const fallback = () => {
+    const ta = $('copyText');
+    ta.value = text;
+    $('copyFallback').hidden = false;
+    ta.focus(); ta.select();
+    status('');
+  };
+  try {
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { fallback(); return; }
+    navigator.clipboard.writeText(text).then(() => status('התוצאה הועתקה. אפשר להדביק אותה בביקורת או ברשת חברתית.'), fallback);
+  } catch (e) { fallback(); }
+});
+
+// ---------- Firebase state ----------
+let fb = null;            // { app, auth, fs, api }
+let fs = null;            // firestore instance (null = offline mode)
+let uid = null, isAdmin = false;
+let ratings = [];
+let readers = {};
+let likesByUser = {};
+let libLoaded = false;
+let editingId = null;
+let confirmId = null;
+
+const normTitle = (s) => String(s || '').normalize('NFC').toLowerCase()
+  .replace(/["'״׳`.,:;!?()\[\]\-–—_]/g, ' ').replace(/\s+/g, ' ').trim();
+const hashKey = (s) => { let h = 5381; for (const ch of s) h = ((h << 5) + h + ch.codePointAt(0)) >>> 0; return h.toString(36); };
+const bookKey = (title) => hashKey(normTitle(title));
+
+function model() {
+  const rs = ratings
+    .map((d) => {
+      const inp = clean({ ...(d.data.inputs || {}), title: d.data.title });
+      return { id: d.id, data: d.data, inp, r: compute(inp), by: typeof d.data.createdBy === 'string' ? d.data.createdBy : '' };
+    })
+    .filter((x) => x.inp.title);
+
+  const authorOf = {}; rs.forEach((x) => { authorOf[x.id] = x.by; });
+  const likeCount = {};
+  Object.entries(likesByUser).forEach(([u, set]) => {
+    set.forEach((rid) => {
+      if (authorOf[rid] !== undefined && authorOf[rid] !== u) likeCount[rid] = (likeCount[rid] || 0) + 1;
+    });
+  });
+
+  const per = {};
+  rs.forEach((x) => { const p = per[x.by] || (per[x.by] = { n: 0, likes: 0 }); p.n++; p.likes += likeCount[x.id] || 0; });
+  const trust = {};
+  Object.entries(per).forEach(([u, p]) => { trust[u] = Math.min(5, 1 + p.likes / p.n); });
+
+  const groups = new Map();
+  rs.forEach((x) => {
+    const key = bookKey(x.inp.title);
+    let g = groups.get(key);
+    if (!g) { g = { key, title: x.inp.title, items: [] }; groups.set(key, g); }
+    x.likes = likeCount[x.id] || 0;
+    x.trust = trust[x.by] || 1;
+    g.items.push(x);
+  });
+  groups.forEach((g) => {
+    g.items.sort((a, b) => String(a.data.createdAt || '').localeCompare(String(b.data.createdAt || '')));
+    g.title = g.items[0].inp.title;
+    const n = g.items.length;
+    const wSum = g.items.reduce((s, x) => s + x.trust, 0);
+    g.n = n;
+    g.simple = g.items.reduce((s, x) => s + x.r.book, 0) / n;
+    g.weighted = g.items.reduce((s, x) => s + x.r.book * x.trust, 0) / wSum;
+    g.you = g.weighted * me.I;
+    g.cat = catFor(g.you);
+    g.min = Math.min(...g.items.map((x) => x.r.book));
+    g.max = Math.max(...g.items.map((x) => x.r.book));
+    g.vetoCount = g.items.filter((x) => x.r.veto).length;
+    g.lastAt = g.items.reduce((m, x) => { const t = String(x.data.updatedAt || x.data.createdAt || ''); return t > m ? t : m; }, '');
+    g.mine = g.items.find((x) => uid && x.by === uid) || null;
+    g.items.sort((a, b) => (b.trust * 10 + b.likes) - (a.trust * 10 + a.likes) || String(b.data.updatedAt || '').localeCompare(String(a.data.updatedAt || '')));
+  });
+  return groups;
+}
+
+let groupsCache = new Map();
+
+const fmtDate = (iso) => {
+  const d = new Date(iso);
+  return isNaN(d) ? '' : d.toLocaleDateString('he-IL', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+
+function raterName(u) {
+  if (uid && u === uid) return `${me.nickname || readers[u] || 'אתם'} (אתם)`;
+  return readers[u] || 'קורא/ת';
+}
+
+function renderAll() {
+  groupsCache = model();
+  $('libCount').textContent = groupsCache.size;
+  const dl = $('knownTitles');
+  dl.innerHTML = '';
+  groupsCache.forEach((g) => { const o = document.createElement('option'); o.value = g.title; dl.appendChild(o); });
+  $('adminTools').hidden = !(isAdmin && libLoaded && !ratings.some((d) => d.id.startsWith('starter-')));
+  if (!appReady) return;
+  if (!$('viewLib').hidden) renderLibrary();
+  if (!$('viewBook').hidden) renderBook(currentBookKey);
+  if (editingId && !ratings.some((d) => d.id === editingId)) setEditing(null);
+}
+
+// ---------- Library view ----------
+function renderLibrary() {
+  const shelf = $('shelf'), msg = $('libMsg');
+  if (!fs) {
+    shelf.innerHTML = '';
+    msg.hidden = false;
+    msg.textContent = 'הספרייה עוד לא מחוברת למסד נתונים. המחשבון עובד גם בלי זה.';
+    return;
+  }
+  if (!libLoaded && !ratings.length) { msg.hidden = false; msg.textContent = 'טוען את הספרייה…'; shelf.innerHTML = ''; return; }
+  const q = normTitle($('libSearch').value);
+  const list = [...groupsCache.values()].filter((g) => !q || normTitle(g.title).includes(q));
+  const sort = $('libSort').value;
+  list.sort((a, b) => {
+    if (sort === 'high') return b.weighted - a.weighted;
+    if (sort === 'low') return a.weighted - b.weighted;
+    if (sort === 'abc') return a.title.localeCompare(b.title, 'he');
+    if (sort === 'count') return b.n - a.n || b.lastAt.localeCompare(a.lastAt);
+    return b.lastAt.localeCompare(a.lastAt);
+  });
+  if (!groupsCache.size) {
+    shelf.innerHTML = '';
+    msg.hidden = false;
+    msg.textContent = 'עוד לא דורגו ספרים. עברו למחשבון, מלאו את שם הספר ולחצו "שמור לספרייה" כדי להוסיף את הראשון.';
+    return;
+  }
+  if (!list.length) {
+    shelf.innerHTML = '';
+    msg.hidden = false;
+    msg.textContent = 'לא נמצאו ספרים שמתאימים לחיפוש.';
+    return;
+  }
+  msg.hidden = true;
+  shelf.innerHTML = '';
+  list.forEach((g) => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'book';
+    a.href = '#book-' + g.key;
+    a.style.setProperty('--cat', g.cat.color);
+    a.innerHTML = `
+      <div class="book-top"><h3></h3><div class="bscore"><span class="v"></span><span class="b"></span></div></div>
+      <div class="chips"><span class="chip cat"></span></div>
+      <div class="book-meta"></div>`;
+    a.querySelector('h3').textContent = g.title;
+    a.querySelector('.bscore .v').textContent = fmt(g.you);
+    a.querySelector('.bscore .b').textContent = `ציון הספר ${fmt(g.weighted)}`;
+    const cc = a.querySelector('.chip.cat'); cc.textContent = g.cat.name; cc.style.background = g.cat.color;
+    if (g.vetoCount) {
+      const w = document.createElement('span'); w.className = 'chip warn';
+      w.textContent = g.n > 1 ? `⚠ תוכן מפורש (${g.vetoCount}/${g.n})` : '⚠ תוכן מפורש';
+      a.querySelector('.chips').appendChild(w);
+    }
+    if (g.mine) { const m = document.createElement('span'); m.className = 'chip plain'; m.textContent = 'דירגתם'; a.querySelector('.chips').appendChild(m); }
+    a.querySelector('.book-meta').textContent = g.n === 1
+      ? `דירוג אחד · ע"י ${raterName(g.items[0].by)}`
+      : `ממוצע של ${g.n} דירוגים · ${fmt(g.min)}–${fmt(g.max)}`;
+    li.appendChild(a);
+    shelf.appendChild(li);
+  });
+}
+$('libSearch').addEventListener('input', renderLibrary);
+$('libSort').addEventListener('change', renderLibrary);
+
+// ---------- Book view ----------
+let currentBookKey = null;
+function renderBook(key) {
+  const g = groupsCache.get(key);
+  const msg = $('bookMsg');
+  if (!g) {
+    $('bookBody').hidden = true;
+    msg.hidden = false;
+    msg.textContent = (!libLoaded && fs) ? 'טוען את הספר…' : 'הספר הזה לא נמצא בספרייה. ייתכן שהדירוגים שלו נמחקו.';
+    return;
+  }
+  msg.hidden = true; $('bookBody').hidden = false;
+  document.title = `${g.title} · מדד ה-S-Book`;
+  $('bvTitle').textContent = g.title;
+  $('bvScore').textContent = fmt(g.you);
+  $('bvBase').textContent = fmt(g.weighted);
+  $('bvI').textContent = `I=${me.I.toFixed(1)}`;
+  paintBadge($('bvBadge'), g.cat);
+  $('bvDesc').textContent = g.cat.desc;
+  $('bvVeto').hidden = !g.vetoCount;
+  if (g.vetoCount) $('bvVeto').textContent = `⚠ ${g.vetoCount === g.n ? (g.n === 1 ? 'המדרג סימן' : 'כל המדרגים סימנו') : `${g.vetoCount} מתוך ${g.n} מדרגים סימנו`} בספר תיאור גרפי (E=3).`;
+  $('bvCount').textContent = g.n;
+  $('bvSimple').textContent = fmt(g.simple);
+  $('bvWeighted').textContent = fmt(g.weighted);
+  $('bvRange').textContent = g.n > 1 ? `${fmt(g.min)}–${fmt(g.max)}` : fmt(g.min);
+  $('rateThis').textContent = g.mine ? 'ערכו את הדירוג שלכם' : 'דרגו את הספר הזה';
+
+  const list = $('ratingsList');
+  list.innerHTML = '';
+  const myLikes = (uid && likesByUser[uid]) || new Set();
+  g.items.forEach((x) => {
+    const li = document.createElement('li');
+    li.className = 'rating';
+    li.style.setProperty('--cat', x.r.cat.color);
+    li.innerHTML = `
+      <div class="rating-top">
+        <div><div class="rater"></div><div class="params"></div></div>
+        <div class="bscore"><span class="v"></span><span class="b"></span></div>
+      </div>
+      <div class="chips"><span class="chip cat"></span></div>
+      <div class="rating-actions"></div>`;
+    const rater = li.querySelector('.rater');
+    rater.textContent = raterName(x.by);
+    if (x.trust > 1) { const t = document.createElement('span'); t.className = 'tr'; t.textContent = `אמון ×${x.trust.toFixed(1)}`; rater.appendChild(t); }
+    const date = fmtDate(x.data.updatedAt || x.data.createdAt);
+    li.querySelector('.params').textContent =
+      `${x.inp.pages} עמ' · ${x.inp.pov === 3 ? 'גוף ראשון' : 'גוף שלישי'} · P ${Math.round(x.inp.percentage * 100)}% · A=${x.inp.apathy}${date ? ' · ' + date : ''}`;
+    li.querySelector('.bscore .v').textContent = fmt(x.r.you);
+    li.querySelector('.bscore .b').textContent = `ציון הספר ${fmt(x.r.book)}`;
+    const cc = li.querySelector('.chip.cat'); cc.textContent = x.r.cat.name; cc.style.background = x.r.cat.color;
+    if (x.r.veto) { const w = document.createElement('span'); w.className = 'chip warn'; w.textContent = '⚠ תוכן מפורש'; li.querySelector('.chips').appendChild(w); }
+
+    const actions = li.querySelector('.rating-actions');
+    const mine = uid && x.by === uid;
+    const canModify = mine || isAdmin;
+
+    if (confirmId === x.id) {
+      const c = document.createElement('div'); c.className = 'confirm';
+      c.append('למחוק את הדירוג הזה?');
+      const yes = document.createElement('button'); yes.type = 'button'; yes.className = 'btn-remove'; yes.textContent = 'כן, מחק';
+      const no = document.createElement('button'); no.type = 'button'; no.className = 'link'; no.textContent = 'ביטול';
+      yes.addEventListener('click', () => removeRating(x));
+      no.addEventListener('click', () => { confirmId = null; renderBook(currentBookKey); });
+      c.append(yes, no);
+      actions.appendChild(c);
+    } else {
+      const like = document.createElement('button');
+      like.type = 'button'; like.className = 'like';
+      const liked = myLikes.has(x.id);
+      like.setAttribute('aria-pressed', liked ? 'true' : 'false');
+      like.append(liked ? 'מסכים/ה ✓' : 'מסכים/ה');
+      const c = document.createElement('span'); c.className = 'c'; c.textContent = x.likes; like.appendChild(c);
+      if (mine) { like.disabled = true; like.title = 'אי אפשר להסכים עם דירוג של עצמכם'; }
+      else if (!fs) { like.disabled = true; }
+      like.addEventListener('click', () => {
+        if (!uid) { requireSignIn('כדי להסכים עם דירוגים צריך להתחבר.'); return; }
+        toggleLike(x.id);
+      });
+      actions.appendChild(like);
+
+      const load = document.createElement('button'); load.type = 'button'; load.className = 'link';
+      load.textContent = canModify ? 'טען לעריכה' : 'טען למחשבון';
+      load.addEventListener('click', () => {
+        fillForm(x.inp);
+        setEditing(canModify ? x.id : null, x.inp.title, !mine);
+        location.hash = 'calc';
+        status(canModify ? '' : 'הדירוג נטען למחשבון. שמירה תיצור דירוג חדש משלכם.');
+      });
+      actions.appendChild(load);
+
+      if (canModify) {
+        const del = document.createElement('button'); del.type = 'button'; del.className = 'link danger'; del.textContent = 'מחק';
+        del.addEventListener('click', () => { confirmId = x.id; renderBook(currentBookKey); });
+        actions.appendChild(del);
+      }
+    }
+    list.appendChild(li);
+  });
+}
+
+$('rateThis').addEventListener('click', () => {
+  const g = groupsCache.get(currentBookKey);
+  if (!g) return;
+  if (g.mine) {
+    fillForm(g.mine.inp);
+    setEditing(g.mine.id, g.mine.inp.title, false);
+  } else {
+    fillForm(clean({ title: g.title, pages: g.items[0].inp.pages, mainEvents: 2, mainExplicit: 2, mainInitiative: 2 }));
+    setEditing(null);
+  }
+  location.hash = 'calc';
+});
+
+// ---------- Auth helpers ----------
+function requireSignIn(msg) {
+  if (!fs) return;
+  if (!$('viewCalc').hidden) status(msg, true, { text: 'התחברות עם Google', onClick: signIn });
+  else { alertInline(msg); }
+}
+function alertInline(msg) {
+  const el = $('bookMsg').hidden ? $('libMsg') : $('bookMsg');
+  const box = document.createElement('p');
+  box.className = 'notice';
+  box.textContent = msg + ' ';
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'link'; b.textContent = 'התחברות עם Google';
+  b.addEventListener('click', signIn);
+  box.appendChild(b);
+  const host = $('viewBook').hidden ? $('viewLib') : $('viewBook');
+  const old = host.querySelector('.notice.signin'); if (old) old.remove();
+  box.classList.add('signin');
+  host.insertBefore(box, host.children[1] || null);
+}
+
+async function signIn() {
+  if (!fb) return;
+  const { auth, api } = fb;
+  const provider = new api.GoogleAuthProvider();
+  try {
+    await api.signInWithPopup(auth, provider);
+  } catch (e) {
+    const code = e && e.code;
+    if (code === 'auth/popup-blocked' || code === 'auth/operation-not-supported-in-this-environment') {
+      try { await api.signInWithRedirect(auth, provider); } catch (e2) { status('ההתחברות לא הצליחה. נסו שוב.', true); }
+    } else if (code !== 'auth/popup-closed-by-user' && code !== 'auth/cancelled-popup-request') {
+      status('ההתחברות לא הצליחה. נסו שוב.', true);
+    }
+  }
+}
+$('signInBtn').addEventListener('click', signIn);
+$('signOutBtn').addEventListener('click', async () => { if (fb) await fb.api.signOut(fb.auth); });
+
+function paintAuth(u) {
+  $('authBox').hidden = !fs;
+  $('signInBtn').hidden = !!u;
+  $('signOutBtn').hidden = !u;
+  $('authState').textContent = u ? `מחוברים${u.email ? ' כ-' + u.email : ''}` : 'אורחים: אפשר לעיין ולחשב. כדי לדרג צריך להתחבר.';
+  $('adminChip').hidden = !isAdmin;
+}
+
+async function saveProfileRemote() {
+  const { api } = fb;
+  const now = new Date().toISOString();
+  await api.setDoc(api.doc(fs, 'profiles', uid), { nickname: me.nickname, I: me.I, answers: me.answers || {}, updatedAt: now });
+  await api.setDoc(api.doc(fs, 'readers', uid), { nickname: me.nickname, updatedAt: now });
+}
+
+// ---------- Likes ----------
+let likeChain = Promise.resolve();
+function toggleLike(ratingId) {
+  if (!fs || !uid) return;
+  likeChain = likeChain.then(async () => {
+    const set = new Set(likesByUser[uid] || []);
+    if (set.has(ratingId)) set.delete(ratingId); else set.add(ratingId);
+    const alive = new Set(ratings.map((d) => d.id));
+    const liked = {};
+    set.forEach((id) => { if (alive.has(id)) liked[id] = true; });
+    try {
+      await fb.api.setDoc(fb.api.doc(fs, 'likes', uid), { liked, updatedAt: new Date().toISOString() });
+    } catch (e) {
+      renderBook(currentBookKey);
+    }
+  });
+}
+
+// ---------- Edit / save / delete ----------
+function setEditing(id, title, asAdmin) {
+  editingId = id;
+  $('editingBar').hidden = !id;
+  $('editingText').textContent = id
+    ? (asAdmin ? `מצב מנהל: עורכים את הדירוג של "${title}" שנכתב ע"י משתמש אחר.` : `עורכים את הדירוג שלכם ל"${title}". שמירה תעדכן אותו בספרייה.`)
+    : '';
+  $('saveBtn').textContent = id ? 'עדכן בספרייה' : 'שמור לספרייה';
+}
+$('stopEditing').addEventListener('click', () => { setEditing(null); status('העריכה בוטלה. שמירה תיצור דירוג חדש.'); });
+
+async function removeRating(x) {
+  try {
+    await fb.api.deleteDoc(fb.api.doc(fs, 'books', x.id));
+    if (editingId === x.id) setEditing(null);
+    confirmId = null;
+  } catch (e) {
+    confirmId = null;
+    renderBook(currentBookKey);
+    alertInline('המחיקה לא הצליחה. ייתכן שאין לכם הרשאה למחוק את הדירוג הזה.');
+  }
+}
+
+let saving = false;
+$('saveBtn').addEventListener('click', async () => {
+  if (saving) return;
+  if (!fs) { status('הספרייה עוד לא מחוברת למסד נתונים.', true); return; }
+  if (!uid) { status('כדי לשמור בספרייה צריך להתחבר.', true, { text: 'התחברות עם Google', onClick: signIn }); return; }
+  const { inp, r } = current;
+  if (!inp.title) { status('כדי לשמור בספרייה צריך למלא את שם הספר.', true); $('bookTitle').focus(); return; }
+
+  let targetId = editingId;
+  if (!targetId) {
+    const g = groupsCache.get(bookKey(inp.title));
+    if (g && g.mine) targetId = g.mine.id;
+  }
+  const existing = targetId ? ratings.find((d) => d.id === targetId) : null;
+  const now = new Date().toISOString();
+  const { title, ...inputs } = inp;
+  const body = {
+    title, score: Number(r.book.toFixed(2)), rawScore: Number(r.raw.toFixed(5)), veto: r.veto, inputs,
+    createdBy: existing ? existing.data.createdBy : uid,
+    createdAt: (existing && existing.data.createdAt) || now, updatedAt: now
+  };
+  saving = true; $('saveBtn').disabled = true;
+  try {
+    const { api } = fb;
+    let id = targetId;
+    if (existing) await api.setDoc(api.doc(fs, 'books', targetId), body);
+    else { const ref = await api.addDoc(api.collection(fs, 'books'), body); id = ref.id; }
+    setEditing(id, title, existing && existing.data.createdBy !== uid);
+    status(existing ? `"${title}" עודכן בספרייה.` : `"${title}" נשמר בספרייה.`, false, { href: '#book-' + bookKey(title), text: 'לעמוד הספר ←' });
+  } catch (e) {
+    if (e && e.code === 'permission-denied') status('אין לכם הרשאה לשמור את הדירוג הזה.', true);
+    else if (e && e.code === 'resource-exhausted') status('הגענו למכסה היומית של האתר. נסו שוב מחר.', true);
+    else status('השמירה לא הצליחה כרגע. נסו שוב בעוד רגע.', true);
+  } finally {
+    saving = false; $('saveBtn').disabled = false;
+  }
+});
+
+// Admin: load starter ratings once
+$('seedBtn').addEventListener('click', async () => {
+  if (!isAdmin) return;
+  $('seedBtn').disabled = true;
+  try {
+    const { api } = fb;
+    const batch = api.writeBatch(fs);
+    batch.set(api.doc(fs, 'readers', STARTER_UID), { nickname: 'דירוג פתיחה של האתר', updatedAt: new Date().toISOString() });
+    STARTER.forEach(([id, title, inputs], i) => {
+      const inp = clean({ ...inputs, title });
+      const r = compute(inp);
+      const t = new Date(Date.UTC(2026, 10, 17, 10, 0, i + 1)).toISOString();
+      batch.set(api.doc(fs, 'books', id), {
+        title, score: Number(r.book.toFixed(2)), rawScore: Number(r.raw.toFixed(5)), veto: r.veto,
+        inputs, createdBy: STARTER_UID, createdAt: t, updatedAt: t
+      });
+    });
+    await batch.commit();
+  } catch (e) {
+    alertInline('הטעינה לא הצליחה. ודאו שאתם מוגדרים כמנהלים ושכללי האבטחה פורסמו.');
+  } finally { $('seedBtn').disabled = false; }
+});
+
+// ---------- Routing ----------
+function route() {
+  if (!appReady) return;
+  const h = (location.hash || '').slice(1);
+  hideViews();
+  document.title = 'מדד ה-S-Book';
+  let tab = 'calc';
+  if (h.startsWith('book-')) {
+    tab = 'lib';
+    currentBookKey = h.slice(5);
+    confirmId = null;
+    $('viewBook').hidden = false;
+    renderBook(currentBookKey);
+  } else if (h === 'library') {
+    tab = 'lib';
+    $('viewLib').hidden = false;
+    renderLibrary();
+  } else {
+    $('viewCalc').hidden = false;
+    $('mbar').hidden = false;
+  }
+  if (tab === 'calc') { $('tabCalc').setAttribute('aria-current', 'page'); $('tabLib').removeAttribute('aria-current'); }
+  else { $('tabLib').setAttribute('aria-current', 'page'); $('tabCalc').removeAttribute('aria-current'); }
+  window.scrollTo({ top: 0, behavior: 'auto' });
+}
+window.addEventListener('hashchange', route);
+
+// ---------- Boot ----------
+function subscribe() {
+  const { api } = fb;
+  const timer = setTimeout(() => {
+    if (!libLoaded) $('libMsg').textContent = 'לא מצליחים להגיע לספרייה כרגע. הנתונים יופיעו כשהחיבור יחזור.';
+  }, 10000);
+
+  api.onSnapshot(api.collection(fs, 'books'), (snap) => {
+    libLoaded = true; clearTimeout(timer);
+    ratings = snap.docs.map((d) => ({ id: d.id, data: d.data() || {} }));
+    renderAll();
+  }, () => {
+    libLoaded = true; clearTimeout(timer);
+    $('libMsg').hidden = false;
+    $('libMsg').textContent = 'הספרייה לא זמינה כרגע. רעננו את הדף מאוחר יותר.';
+  });
+
+  api.onSnapshot(api.collection(fs, 'readers'), (snap) => {
+    const m = {};
+    snap.docs.forEach((d) => {
+      const n = d.data() && d.data().nickname;
+      if (typeof n === 'string' && n.trim()) m[d.id] = n.trim().slice(0, 40);
+    });
+    readers = m;
+    renderAll();
+  }, () => {});
+
+  api.onSnapshot(api.collection(fs, 'likes'), (snap) => {
+    const m = {};
+    snap.docs.forEach((d) => {
+      const liked = d.data() && d.data().liked;
+      const set = new Set();
+      if (liked && typeof liked === 'object') Object.keys(liked).slice(0, 5000).forEach((k) => { if (liked[k] === true) set.add(k); });
+      m[d.id] = set;
+    });
+    likesByUser = m;
+    renderAll();
+  }, () => {});
+}
+
+async function boot() {
+  if (!firebaseConfig) {
+    $('offlineNote').hidden = false;
+    if (adoptProfile(loadLocal())) enterApp(); else showOnboarding(false);
+    return;
+  }
+  try {
+    const [appMod, authMod, fsMod] = await Promise.all([
+      import(FB + 'firebase-app.js'), import(FB + 'firebase-auth.js'), import(FB + 'firebase-firestore.js')
+    ]);
+    const app = appMod.initializeApp(firebaseConfig);
+    const auth = authMod.getAuth(app);
+    fs = fsMod.getFirestore(app);
+    fb = { app, auth, api: { ...authMod, ...fsMod } };
+  } catch (e) {
+    fs = null; fb = null;
+    $('offlineNote').hidden = false;
+    $('offlineNote').textContent = 'לא הצלחנו להתחבר לספרייה. המחשבון עובד, נסו לרענן מאוחר יותר.';
+    if (adoptProfile(loadLocal())) enterApp(); else showOnboarding(false);
+    return;
+  }
+  subscribe();
+  fb.api.getRedirectResult(fb.auth).catch(() => {});
+
+  fb.api.onAuthStateChanged(fb.auth, async (u) => {
+    uid = u ? u.uid : null;
+    isAdmin = false;
+    let profile = null;
+    if (u) {
+      try { isAdmin = (await fb.api.getDoc(fb.api.doc(fs, 'admins', uid))).exists(); } catch (e) {}
+      try { const p = await fb.api.getDoc(fb.api.doc(fs, 'profiles', uid)); if (p.exists()) profile = p.data(); } catch (e) {}
+    }
+    paintAuth(u);
+    if (adoptProfile(profile)) {
+      saveLocal();
+      enterApp();
+    } else if (adoptProfile(loadLocal())) {
+      if (u && me.nickname) { try { await saveProfileRemote(); } catch (e) {} }
+      enterApp();
+    } else {
+      showOnboarding(false);
+    }
+  });
+}
+
+// ---------- Wiring ----------
+const formCol = document.querySelector('.form-col');
+formCol.addEventListener('input', calculate);
+formCol.addEventListener('change', calculate);
+$('addSec').addEventListener('click', () => addSecondary(null, true));
+$('mbar').addEventListener('click', () => $('resultBox').scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block: 'start' }));
+
+if ('IntersectionObserver' in window) {
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach((e) => $('mbar').classList.toggle('away', e.isIntersecting));
+  }, { threshold: 0.05 });
+  io.observe($('resultBox'));
+}
+
+calculate();
+boot();
+</script>
+
+</body>
+</html>
